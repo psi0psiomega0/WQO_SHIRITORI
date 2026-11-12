@@ -424,7 +424,8 @@
         loser: null,
         winner: null,
         endReason: null,
-        noMoveDetail: null
+        noMoveDetail: null,
+        demoAlphabetSequence: null
       };
 
       const smallToLarge = {
@@ -1368,6 +1369,8 @@
         if (ending === 'prefix') return '前置部分文字列禁止';
         if (ending === 'suffix') return '後置部分文字列禁止';
         if (ending === 'substring') return '部分文字列禁止';
+        if (ending === 'last') return '末尾文字一致禁止';
+        if (ending === 'alphabet') return '使用文字包含禁止';
         return '未対応の終了条件';
       }
 
@@ -1624,14 +1627,233 @@
         }
       }
 
-      // 同一文字列・前置部分文字列・後置部分文字列・部分文字列禁止のお手本列を1手だけ生成する。
-      // 生成候補は必ず通常のsubmitWord()を通し、長さ・接続・文字集合などの共通判定を受ける。
+      // 末尾文字一致禁止のお手本列。既出語で使われた最大順位の次の文字を
+      // 接続部分の後ろに繰り返し、末尾文字を毎回ひとつずつ進める。
+      // 文字集合を使い切った場合は末尾を重複させ、共通判定で反則終了させる。
+      function createLastDemoCandidate(rules, alphabet, c, previous) {
+        const turnIndex = state.words.length + 1;
+        const bounds = readLengthBounds(rules, turnIndex);
+        const first = alphabet[0];
+        const length = demoSafeIntegerLength(
+          maxBigInt(2n, bounds.min === null ? 1n : bounds.min, previous ? c : 1n)
+        );
+
+        if (!previous) return repeatDemoFirstChar(first, length);
+
+        const cNumber = Number(c);
+        if (!Number.isSafeInteger(cNumber) || cNumber < 0 || cNumber > MAX_DEMO_WORD_UNITS) {
+          throw new Error('接続文字数が安全な範囲を超えています。');
+        }
+        // submitWord() と同じく、初期ランプ中は直前語全体を接続部分とする。
+        const overlap = Math.min(cNumber, previous.units.length);
+        const prefix = previous.units.slice(previous.units.length - overlap);
+        if (length < overlap) return previous.memo;
+
+        const rankMap = new Map(alphabet.map((ch, index) => [ch, index]));
+        let maximumRank = -1;
+        for (const ch of previous.units) {
+          const rank = rankMap.get(ch);
+          if (rank === undefined) throw new Error('直前の文字列に文字集合外の文字が含まれています。');
+          if (rank > maximumRank) maximumRank = rank;
+        }
+        let nextChar = alphabet[maximumRank + 1];
+        // 「ん」末尾禁止が有効なら、その文字は次の候補にせず、末尾一致で終了する。
+        if (rules.n === 'forbid' && nextChar === 'ん') nextChar = undefined;
+        const remaining = length - prefix.length;
+
+        // 新しい文字を置く余地がない、または五十音を使い切った場合は、
+        // 直前の末尾文字を繰り返して末尾一致の反則手を作る。
+        if (!nextChar || remaining === 0) {
+          const repeatedLast = previous.units[previous.units.length - 1] || first;
+          return prefix.join('') + repeatedLast.repeat(remaining);
+        }
+        return prefix.join('') + nextChar.repeat(remaining);
+      }
+
+      // 使用文字包含禁止（通常モード）のお手本列。
+      // bit列の 1 > 0 の辞書順で、現在の集合より小さく、共通元を持ち、
+      // 要素数が 2..maxCount の集合のうち辞書順最大のものを動的計画法＋貪欲法で求める。
+      function findLexicographicallyMaximalLowerSubset(currentSet, alphabet, maxCountValue) {
+        const n = alphabet.length;
+        const boundedCount = maxCountValue === null
+          ? BigInt(n)
+          : (maxCountValue > BigInt(n) ? BigInt(n) : maxCountValue);
+        const maxCount = Number(boundedCount);
+        if (!Number.isSafeInteger(maxCount) || maxCount < 2 || n < 2) return null;
+        const currentMembers = new Set(currentSet);
+        const currentBits = alphabet.map(ch => currentMembers.has(ch) ? 1 : 0);
+        const memo = new Map();
+
+        function canComplete(index, alreadyLess, count, hasCommon) {
+          if (count > maxCount || count + (n - index) < 2) return false;
+          if (index === n) return alreadyLess && count >= 2 && hasCommon;
+          const key = `${index},${alreadyLess ? 1 : 0},${count},${hasCommon ? 1 : 0}`;
+          if (memo.has(key)) return memo.get(key);
+          const currentBit = currentBits[index];
+          const choices = alreadyLess ? [1, 0] : (currentBit === 1 ? [1, 0] : [0]);
+          for (const bit of choices) {
+            const less = alreadyLess || bit < currentBit;
+            if (canComplete(index + 1, less, count + bit, hasCommon || (bit === 1 && currentBit === 1))) {
+              memo.set(key, true);
+              return true;
+            }
+          }
+          memo.set(key, false);
+          return false;
+        }
+
+        const result = [];
+        let alreadyLess = false;
+        let count = 0;
+        let hasCommon = false;
+        for (let index = 0; index < n; index++) {
+          const currentBit = currentBits[index];
+          const choices = alreadyLess ? [1, 0] : (currentBit === 1 ? [1, 0] : [0]);
+          let selected = null;
+          for (const bit of choices) {
+            const less = alreadyLess || bit < currentBit;
+            const nextCount = count + bit;
+            const nextCommon = hasCommon || (bit === 1 && currentBit === 1);
+            if (canComplete(index + 1, less, nextCount, nextCommon)) {
+              selected = bit;
+              alreadyLess = less;
+              count = nextCount;
+              hasCommon = nextCommon;
+              break;
+            }
+          }
+          if (selected === null) return null;
+          if (selected === 1) result.push(alphabet[index]);
+        }
+        return alreadyLess && count >= 2 && hasCommon ? result : null;
+      }
+
+      function getAlphabetDemoUnits(rules) {
+        const rawAlphabet = getDemoAlphabet(rules);
+        if (rules.characterSet !== 'hiragana') return rawAlphabet;
+        // ひらがな設定で濁点等を統合する場合、判定側の文字まとまりに合わせて
+        // 文字集合を正規化し、同じまとまりが複数回現れないようにする。
+        const result = [];
+        const seen = new Set();
+        for (const ch of rawAlphabet) {
+          const normalized = normalizeWord(ch, rules);
+          const units = kanaUnits(normalized, rules);
+          for (const unit of units) {
+            if (!seen.has(unit)) {
+              seen.add(unit);
+              result.push(unit);
+            }
+          }
+        }
+        return result;
+      }
+
+      function readAlphabetDemoBounds(rules, turnNumber) {
+        // 下限と上限が矛盾する場合も候補を通常判定へ渡し、反則履歴に記録させる。
+        return readLengthBounds(rules, turnNumber);
+      }
+
+      function createInitialAlphabetDemoSequence(rules, alphabet, c) {
+        if (!alphabet.length) throw new Error('使用できる文字集合が空です。');
+        const bounds = readAlphabetDemoBounds(rules, 1);
+        // 上限がなければ全体集合。有限なら |S_1| = 上限 - 2c + 1 を目標にし、
+        // 文字集合の大きさを超える場合は全体集合を採用する。
+        let initialCount;
+        if (bounds.max === null) {
+          initialCount = alphabet.length;
+        } else {
+          const requestedCount = bounds.max - 2n * c + 1n;
+          if (requestedCount < 1n) {
+            throw new Error('初手の使用文字集合を作れません。文字数上限は接続文字数の2倍以上にしてください。');
+          }
+          initialCount = Number(requestedCount > BigInt(alphabet.length) ? BigInt(alphabet.length) : requestedCount);
+        }
+        return [{ set: alphabet.slice(0, initialCount), first: alphabet[0] }];
+      }
+
+      function createAlphabetDemoCandidate(rules, alphabet, c) {
+        const turnIndex = state.words.length + 1;
+        const connection = demoSafeNonnegativeLength(c, '接続文字数');
+        let sequence = state.demoAlphabetSequence;
+        if (!Array.isArray(sequence) || sequence.length === 0) {
+          sequence = createInitialAlphabetDemoSequence(rules, alphabet, c);
+        } else {
+          // 反則手を取り消した場合などに、まだ有効になっていない先読み状態を捨てる。
+          sequence = sequence.slice(0, turnIndex);
+        }
+
+        while (sequence.length <= turnIndex) {
+          const nextTurn = sequence.length + 1;
+          const nextBounds = readAlphabetDemoBounds(rules, nextTurn);
+          // S_{i+1} の要素数上限は、第 i+1 ターン目自身の文字数上限から決める。
+          // 上限がなければ要素数上限を設けず、全体集合の大きさまで許す。
+          const nextCapacity = nextBounds.max === null ? null : nextBounds.max - 2n * c + 1n;
+          const current = sequence[sequence.length - 1];
+          const selectedSet = nextCapacity !== null && nextCapacity < 2n
+            ? null
+            : findLexicographicallyMaximalLowerSubset(current.set, alphabet, nextCapacity);
+          if (selectedSet) {
+            const selectedMembers = new Set(selectedSet);
+            const commonFirst = alphabet.find(ch => current.set.includes(ch) && selectedMembers.has(ch));
+            // 共通元を持つ候補だけを返すので通常は必ず見つかる。防御的に再確認する。
+            if (commonFirst === undefined) {
+              throw new Error('次の使用文字集合に共通元が見つかりません。');
+            }
+            sequence.push({ set: selectedSet, first: commonFirst });
+          } else {
+            // 条件を満たす集合がなければ、集合と先頭文字の組をそのまま繰り返す。
+            sequence.push({ set: current.set.slice(), first: current.first });
+          }
+        }
+        state.demoAlphabetSequence = sequence;
+
+        const current = sequence[turnIndex - 1];
+        const next = sequence[turnIndex];
+        const bounds = readAlphabetDemoBounds(rules, turnIndex);
+        const middle = current.set.filter(ch => ch !== current.first);
+        const requiredLength = 2 * connection + middle.length;
+        let targetLength = BigInt(Math.max(1, requiredLength));
+
+        // 中央部の残りは、下限に届かない場合に限って次ターンの先頭文字で補う。
+        if (bounds.min !== null && bounds.min > targetLength) targetLength = bounds.min;
+
+        // 初手だけは、要求された集合サイズが使用可能な文字数を超えた場合、
+        // 全体集合を使い切った後も第2ターン目の先頭文字で上限まで埋める。
+        if (turnIndex === 1 && bounds.max !== null) {
+          const requestedInitialCount = bounds.max - 2n * c + 1n;
+          if (requestedInitialCount > BigInt(alphabet.length) && bounds.max > targetLength) {
+            targetLength = bounds.max;
+          }
+        }
+
+        const safeTargetLength = demoSafeIntegerLength(targetLength, `第${turnIndex}ターン目のお手本文字列長`);
+        if (safeTargetLength > MAX_DEMO_WORD_UNITS) {
+          throw new Error(`お手本の1語が安全上限の${MAX_DEMO_WORD_UNITS.toLocaleString()}文字を超えます。`);
+        }
+        const fillCount = safeTargetLength - requiredLength;
+        return [
+          ...Array(connection).fill(current.first),
+          ...middle,
+          ...Array(fillCount).fill(next.first),
+          ...Array(connection).fill(next.first)
+        ].join('');
+      }
+
+      // 各お手本列を1手だけ生成する。生成候補は必ず通常のsubmitWord()を通し、
+      // 長さ・接続・文字集合・禁止条件などの共通判定を受ける。
       function createDemoCandidate(rules, alphabet, c) {
         if (!alphabet.length) throw new Error('使用できる文字集合が空です。');
         const previous = state.words.length ? state.words[state.words.length - 1] : null;
         if (rules.ending === 'same') return createSameDemoCandidate(rules, alphabet, c, previous);
+        if (rules.ending === 'last') return createLastDemoCandidate(rules, alphabet, c, previous);
+        if (rules.ending === 'alphabet') {
+          if (rules.reciprocal === 'mutual') {
+            throw new Error('使用文字包含禁止のお手本アルゴリズムは通常モード専用です。相互モード用のアルゴリズムは別途実装が必要です。');
+          }
+          return createAlphabetDemoCandidate(rules, alphabet, c);
+        }
         if (rules.ending !== 'prefix' && rules.ending !== 'suffix' && rules.ending !== 'substring') {
-          throw new Error('お手本モードは同一文字列・前置部分文字列・後置部分文字列・部分文字列禁止に対応しています。');
+          throw new Error('お手本モードは同一文字列・前置部分文字列・後置部分文字列・部分文字列・使用文字包含禁止（通常モード）・末尾文字一致禁止に対応しています。');
         }
 
         const turnIndex = state.words.length + 1;
@@ -1651,7 +1873,7 @@
         let alphabet;
         let c;
         try {
-          alphabet = getDemoAlphabet(rules);
+          alphabet = rules.ending === 'alphabet' ? getAlphabetDemoUnits(rules) : getDemoAlphabet(rules);
           c = getDemoConnectionConstant(rules);
         } catch (error) {
           feedback(error.message);
@@ -1978,8 +2200,12 @@
       function validateGameSettings() {
         const rules = currentRules();
         if (isDemoMode()) {
-          if (!['same', 'prefix', 'suffix', 'substring'].includes(rules.ending)) {
-            feedback('現在のお手本モードは「1. 同一文字列禁止」「2. 前置部分文字列禁止」「3. 後置部分文字列禁止」「4. 部分文字列禁止」に対応しています。');
+          if (!['same', 'prefix', 'suffix', 'substring', 'alphabet', 'last'].includes(rules.ending)) {
+            feedback('現在のお手本モードは「1. 同一文字列禁止」「2. 前置部分文字列禁止」「3. 後置部分文字列禁止」「4. 部分文字列禁止」「8. 使用文字包含禁止（通常モード）」「9. 末尾文字一致禁止」に対応しています。');
+            return false;
+          }
+          if (rules.ending === 'alphabet' && rules.reciprocal === 'mutual') {
+            feedback('使用文字包含禁止のお手本アルゴリズムは通常モード専用です。相互モードは別のアルゴリズムとして扱います。');
             return false;
           }
           try {
@@ -1987,8 +2213,14 @@
               feedback('現在のお手本モードでは、接続文字数 f(i) は定数にしてください（例：0、1、2）。');
               return false;
             }
-            getDemoAlphabet(rules);
-            getDemoConnectionConstant(rules);
+            if (rules.ending === 'alphabet') {
+              const alphabet = getAlphabetDemoUnits(rules);
+              const c = getDemoConnectionConstant(rules);
+              state.demoAlphabetSequence = createInitialAlphabetDemoSequence(rules, alphabet, c);
+            } else {
+              getDemoAlphabet(rules);
+              getDemoConnectionConstant(rules);
+            }
           } catch (error) {
             feedback(`お手本モードの設定を確認してください：${error.message}`);
             return false;
@@ -2257,6 +2489,9 @@
           }
           state.playerCounts[removed.player] = Math.max(0, state.playerCounts[removed.player] - 1);
         }
+        if (Array.isArray(state.demoAlphabetSequence)) {
+          state.demoAlphabetSequence = state.demoAlphabetSequence.slice(0, state.words.length + 1);
+        }
         state.finished = false;
         state.loser = null;
         state.winner = null;
@@ -2278,6 +2513,7 @@
         state.turn = 0;
         state.words = [];
         state.history = [];
+        state.demoAlphabetSequence = null;
         state.playerCounts = Array(state.playerNames.length).fill(0);
         state.activePlayers = Array(state.playerNames.length).fill(true);
         state.eliminationOrder = [];
