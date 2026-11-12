@@ -1,0 +1,2319 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f1e9">
+  <title>ことばをつなごう — 文字列ゲーム</title>
+  <style>
+    :root {
+      --ink: #28332e;
+      --muted: #778078;
+      --paper: #fbfaf6;
+      --canvas: #f2eee5;
+      --line: #e6e2d8;
+      --green: #527764;
+      --green-dark: #3e604f;
+      --green-pale: #e8f0e9;
+      --orange: #c77b4e;
+      --orange-pale: #f8eee6;
+      --red: #b64f48;
+      --shadow: 0 18px 50px rgba(50, 57, 48, .08);
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        radial-gradient(ellipse at 12% 8%, rgba(199,123,78,.09), transparent 30rem),
+        radial-gradient(ellipse at 92% 85%, rgba(82,119,100,.09), transparent 34rem),
+        var(--canvas);
+    }
+    button, input { font: inherit; }
+    .page { width: min(960px, calc(100% - 32px)); margin: 0 auto; padding: 42px 0 54px; }
+    header { text-align: center; margin-bottom: 27px; }
+    .eyebrow { display: inline-flex; align-items: center; gap: 8px; color: var(--green); font-size: 12px; font-weight: 800; letter-spacing: .16em; }
+    .eyebrow::before, .eyebrow::after { content: ""; width: 22px; height: 1px; background: #a7b6a9; }
+    h1 { margin: 9px 0 6px; font-family: "Yu Mincho", "Hiragino Mincho ProN", serif; font-size: clamp(30px, 5vw, 43px); font-weight: 600; letter-spacing: .08em; }
+    .subtitle { margin: 0; color: var(--muted); font-size: 14px; }
+    .board { overflow: hidden; background: var(--paper); border: 1px solid rgba(95,106,92,.12); border-radius: 24px; box-shadow: var(--shadow); }
+    .players-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 24px 0; background: rgba(247,246,240,.8); }
+    .players-toolbar label { display: flex; align-items: center; gap: 9px; color: #5d6d60; font-size: 12px; font-weight: 800; }
+    .players-toolbar select { min-height: 36px; padding: 5px 28px 5px 9px; border: 1px solid #dcded5; border-radius: 9px; background: white; color: var(--ink); }
+    .players-toolbar .roster-note { color: var(--muted); font-size: 11px; }
+    .players { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr)); gap: 12px; padding: 14px 24px 18px; background: rgba(247,246,240,.8); border-bottom: 1px solid var(--line); }
+    .player { position: relative; min-width: 0; padding: 16px 18px 14px; border: 1px solid var(--line); border-radius: 16px; background: #fffefa; transition: border-color .2s, background .2s, transform .2s; }
+    .player.active { border-color: #91ad99; background: var(--green-pale); box-shadow: inset 0 0 0 1px rgba(82,119,100,.12); }
+    .player.winner { border-color: #d8a77e; background: #fbf1e7; }
+    .player.eliminated { opacity: .58; border-color: #d9a29b; background: #fff3f1; filter: grayscale(.55); }
+    .player.eliminated .player-name { text-decoration: line-through; }
+    .player-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; }
+    .player-label { color: var(--muted); font-size: 11px; letter-spacing: .12em; font-weight: 800; }
+    .turn-chip { display: none; color: white; background: var(--green); border-radius: 99px; padding: 4px 9px; font-size: 10px; font-weight: 700; white-space: nowrap; }
+    .player.active .turn-chip { display: inline-block; }
+    .player-name { width: 100%; min-width: 0; border: 0; border-bottom: 1px solid transparent; border-radius: 0; outline: 0; padding: 1px 0 5px; color: var(--ink); background: transparent; font-size: 19px; font-weight: 750; }
+    .player-name:focus { border-bottom-color: #91ad99; }
+    .player-count { margin-top: 5px; color: var(--muted); font-size: 12px; }
+    .settings-panel { padding: 20px 24px 22px; border-bottom: 1px solid var(--line); background: #fffefa; }
+    .settings-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+    .settings-title { margin: 0; font-size: 14px; font-weight: 800; letter-spacing: .04em; }
+    .settings-note { margin: 0; color: var(--muted); font-size: 11px; }
+    .settings-section + .settings-section { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+    .settings-section[hidden] { display: none; }
+    .settings-section-title { margin: 0 0 10px; color: #657468; font-size: 12px; font-weight: 800; letter-spacing: .03em; }
+    .settings-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .setting-field { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+    .setting-field[hidden] { display: none; }
+    .setting-label { color: #5d6d60; font-size: 12px; font-weight: 800; }
+    .rule-select { width: 100%; min-height: 43px; padding: 8px 30px 8px 10px; border: 1px solid #dcded5; border-radius: 10px; outline: none; color: var(--ink); background: white; font-size: 12px; }
+    .rule-select:focus { border-color: #8aa894; box-shadow: 0 0 0 3px rgba(82,119,100,.10); }
+    .rule-select:disabled { opacity: .65; color: #737b73; background: #f4f3ee; }
+    .setting-help { min-height: 34px; margin: 0; color: #858c83; font-size: 11px; line-height: 1.55; }
+    .setting-help.error { color: var(--red); }
+    .function-input { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .function-preview { margin-top: 10px; padding: 10px 12px; border-radius: 10px; color: #657468; background: #f4f6f1; font-size: 11px; line-height: 1.6; }
+    .function-preview.error { color: var(--red); background: #fff3f1; }
+    .length-range { width: fit-content; max-width: 100%; margin: 11px auto 0; padding: 8px 13px; border: 1px solid #dfe7dc; border-radius: 999px; color: var(--green-dark); background: #f2f6f0; text-align: center; font-size: 12px; font-weight: 750; line-height: 1.5; }
+    .length-range.error { border-color: #e5c1bb; color: var(--red); background: #fff3f1; }
+    .settings-lock { margin: 12px 0 0; color: var(--muted); font-size: 11px; }
+    .start-panel { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px; margin: 0 auto 20px; padding: 15px 18px; border: 1px solid #dfe7dc; border-radius: 14px; background: #f6f8f3; text-align: center; }
+    .start-panel[hidden] { display: none !important; }
+    .start-note { margin: 0; color: #657468; font-size: 12px; line-height: 1.6; }
+    .start-button { min-height: 44px; padding: 10px 19px; border: 0; border-radius: 11px; color: white; background: var(--green); font-size: 13px; font-weight: 800; cursor: pointer; }
+    .start-button:hover { background: var(--green-dark); }
+    .demo-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; margin: 0 auto 18px; padding: 14px; border: 1px solid #dfe7dc; border-radius: 14px; background: #f6f8f3; }
+    .demo-controls[hidden], .entry-form[hidden], .input-note[hidden] { display: none !important; }
+    .demo-note { flex: 1 0 100%; margin: 0; color: #657468; text-align: center; font-size: 12px; line-height: 1.6; }
+    .demo-step-label { display: inline-flex; align-items: center; gap: 8px; color: #5d6d60; font-size: 12px; font-weight: 800; }
+    .demo-step-input { width: 100px; min-height: 42px; padding: 7px 9px; border: 1px solid #dcded5; border-radius: 10px; background: white; color: var(--ink); }
+    .demo-button { min-height: 43px; padding: 9px 15px; border: 0; border-radius: 10px; color: white; background: var(--green); font-size: 12px; font-weight: 800; cursor: pointer; }
+    .demo-button:hover { background: var(--green-dark); }
+    .demo-button:disabled, .demo-step-input:disabled { opacity: .45; cursor: not-allowed; }
+    .demo-status { flex: 1 0 100%; margin: 0; color: var(--muted); text-align: center; font-size: 11px; }
+    .warning-overlay { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 20px; background: rgba(31, 39, 32, .56); }
+    .warning-overlay[hidden] { display: none !important; }
+    .warning-dialog { width: min(480px, 100%); padding: 26px; border: 1px solid #e6c4a1; border-radius: 20px; background: #fffefa; box-shadow: 0 22px 70px rgba(0,0,0,.22); text-align: center; }
+    .warning-icon { display: grid; place-items: center; width: 42px; height: 42px; margin: 0 auto 12px; border-radius: 50%; color: #8c572b; background: #f8ead9; font-size: 24px; font-weight: 900; }
+    .warning-dialog h2 { margin: 0 0 10px; color: #76512e; font-size: 19px; }
+    .warning-dialog p { margin: 0; color: #6f7068; font-size: 13px; line-height: 1.85; }
+    .warning-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 9px; margin-top: 21px; }
+    .warning-continue { background: #9a6335; }
+    .warning-continue:hover { background: #7d4e2b; }
+    .game-area { padding: 30px clamp(18px, 5vw, 54px) 34px; }
+    .turn-panel { text-align: center; }
+    .turn-caption { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .14em; }
+    .turn-title { margin: 7px 0 2px; font-family: "Yu Mincho", "Hiragino Mincho ProN", serif; font-size: clamp(22px, 4vw, 30px); font-weight: 600; }
+    .turn-description { margin: 0; color: var(--muted); font-size: 13px; }
+    .required-wrap { display: flex; align-items: center; justify-content: center; gap: 11px; min-height: 90px; margin: 17px 0 22px; }
+    .required-label { color: var(--muted); font-size: 12px; }
+    .required-letter { display: grid; place-items: center; flex: 0 0 auto; width: max-content; min-width: 66px; max-width: calc(100vw - 48px); height: 66px; padding: 0 18px; border-radius: 20px; color: var(--green-dark); background: var(--green-pale); font-family: "Yu Mincho", "Hiragino Mincho ProN", serif; font-size: 35px; font-weight: 700; white-space: nowrap; overflow-x: auto; } 
+    .required-letter.first { width: auto; min-width: 0; height: auto; padding: 0; color: #a0a69d; background: transparent; font-size: 15px; font-family: inherit; font-weight: 500; }
+    .entry-form { display: flex; gap: 10px; width: min(570px, 100%); margin: 0 auto; }
+    .word-input { flex: 1; min-width: 0; height: 56px; padding: 0 18px; border: 1px solid #dcded5; border-radius: 14px; outline: none; color: var(--ink); background: white; font-size: 18px; transition: border-color .2s, box-shadow .2s; }
+    .word-input:focus { border-color: #8aa894; box-shadow: 0 0 0 4px rgba(82,119,100,.10); }
+    .word-input::placeholder { color: #b2b7ae; font-size: 15px; }
+    .submit-button { flex: 0 0 auto; min-width: 116px; height: 56px; border: 0; border-radius: 14px; color: white; background: var(--green); font-weight: 750; cursor: pointer; transition: background .2s, transform .15s; }
+    .submit-button:hover { background: var(--green-dark); }
+    .submit-button:active { transform: translateY(1px); }
+    .submit-button:disabled, .word-input:disabled { opacity: .48; cursor: not-allowed; }
+    .input-note { margin: 8px 0 0; color: #92988f; text-align: center; font-size: 11px; line-height: 1.5; }
+    .feedback { min-height: 25px; margin: 12px 0 0; color: var(--red); text-align: center; font-size: 13px; }
+    .feedback.success { color: var(--green); }
+    .end-panel { display: none; width: min(570px, 100%); margin: 14px auto 0; padding: 17px; border: 1px solid #ead8c5; border-radius: 15px; background: var(--orange-pale); text-align: center; }
+    .end-panel.show { display: block; }
+    .end-title { margin: 0 0 5px; color: #895531; font-size: 18px; font-weight: 800; }
+    .end-detail { margin: 0; color: #806f60; font-size: 13px; white-space: pre-line; line-height: 1.8; }
+    .toolbar { display: flex; justify-content: center; gap: 9px; margin-top: 5px; }
+    .sub-button { padding: 9px 14px; border: 1px solid var(--line); border-radius: 10px; color: #667168; background: transparent; font-size: 12px; cursor: pointer; }
+    .sub-button:hover:not(:disabled) { border-color: #aab8ad; background: #f7f8f4; }
+    .sub-button:disabled { opacity: .35; cursor: not-allowed; }
+    .history-section { border-top: 1px solid var(--line); padding: 22px clamp(18px, 5vw, 54px) 26px; background: #fdfcf8; }
+    .history-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 13px; }
+    .history-title { margin: 0; font-size: 14px; font-weight: 800; letter-spacing: .04em; }
+    .history-count { color: #9a9f96; font-size: 11px; }
+    .history-note { margin: -7px 0 12px; color: #92988f; font-size: 11px; }
+    .history-item.rule-violation { border-color: #d9a29b; background: #fff3f1; }
+    .history-item.rule-violation .word, .history-item.rule-violation .owner { color: var(--red); }
+    .history-item.rule-violation .owner { font-weight: 800; }
+    .history-list { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 8px; min-height: 38px; max-height: 420px; overflow: auto; padding: 2px 3px 8px 0; }
+    .history-item { display: inline-flex; align-items: center; gap: 8px; padding: 8px 11px; border: 1px solid var(--line); border-radius: 10px; background: white; }
+    .history-item .number { color: #a0a69d; font-size: 10px; }
+    .history-item .word { color: var(--ink); font-size: 14px; font-weight: 700; }
+    .history-item .owner { color: var(--muted); font-size: 10px; }
+    .empty-history { align-self: center; color: #a5aaa2; font-size: 13px; }
+    .rules { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 17px; }
+    .rule { padding: 14px 15px; border: 1px solid rgba(128,137,125,.14); border-radius: 13px; background: rgba(255,254,250,.64); }
+    .rule strong { display: block; margin-bottom: 4px; color: #5d6d60; font-size: 11px; }
+    .rule span { color: #858c83; font-size: 11px; line-height: 1.65; }
+    footer { padding-top: 20px; color: #969b92; text-align: center; font-size: 11px; }
+    @media (max-width: 600px) {
+      .page { width: min(100% - 20px, 520px); padding: 27px 0 32px; }
+      header { margin-bottom: 19px; }
+      .players-toolbar { padding: 13px 13px 0; align-items: flex-start; flex-direction: column; }
+      .players { gap: 8px; padding: 13px; }
+      .player { padding: 12px 11px; }
+      .settings-panel { padding: 16px 13px; }
+      .settings-head { display: block; }
+      .settings-note { margin-top: 4px; }
+      .settings-grid { grid-template-columns: 1fr; gap: 11px; }
+      .setting-help { min-height: 0; }
+      .player-name { font-size: 16px; }
+      .game-area { padding-top: 25px; padding-bottom: 25px; }
+      .entry-form { gap: 7px; }
+      .word-input { height: 52px; padding: 0 12px; font-size: 16px; }
+      .submit-button { min-width: 88px; height: 52px; }
+      .rules { grid-template-columns: 1fr; gap: 7px; }
+      .rule { padding: 10px 12px; }
+      .required-wrap { margin: 12px 0 17px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div class="eyebrow">WORD STRING GAME</div>
+      <h1>ことばをつなごう</h1>
+      <p class="subtitle">お手本生成・1人プレイ・最大10人対戦に対応する文字列ゲーム</p>
+    </header>
+
+    <noscript><p style="padding:14px; border:1px solid #d9a29b; border-radius:12px; background:#fff4f1; color:#8b3d36; text-align:center;">このしりとりを遊ぶにはJavaScriptが必要です。ファイルをダウンロードし、SafariやChromeなどのブラウザで開いてください。</p></noscript>
+
+    <main class="board">
+      <div class="players-toolbar">
+        <label for="playerCountSetting">参加人数
+          <select id="playerCountSetting">
+            <option value="0">0人（お手本モード）</option>
+            <option value="1">1人（ソロチャレンジ）</option>
+            <option value="2" selected>2人</option>
+            <option value="3">3人</option><option value="4">4人</option><option value="5">5人</option>
+            <option value="6">6人</option><option value="7">7人</option><option value="8">8人</option>
+            <option value="9">9人</option><option value="10">10人</option>
+          </select>
+        </label>
+        <span class="roster-note" id="rosterNote">反則したプレイヤーは脱落し、残りの人で続行します。</span>
+      </div>
+      <section class="players" id="playersGrid" aria-label="プレイヤー一覧"></section>
+
+      <section class="settings-panel" aria-label="文字集合と判定ルール">
+        <div class="settings-head">
+          <h2 class="settings-title">文字集合と判定ルール</h2>
+          <p class="settings-note">文字集合・文字の扱い・禁止条件を順に設定できます</p>
+        </div>
+        <section class="settings-section" aria-label="文字集合の指定">
+          <h3 class="settings-section-title">文字集合の指定</h3>
+          <div class="settings-grid">
+            <label class="setting-field" for="characterSet">
+              <span class="setting-label">文字集合</span>
+              <select class="rule-select" id="characterSet">
+                <option value="hiragana" selected>ひらがな</option>
+                <option value="latin">ラテンアルファベット（A～Z）</option>
+                <option value="digits">数字（0～9）</option>
+                <option value="custom">ユーザー定義</option>
+              </select>
+              <p class="setting-help" id="characterSetHelp">カタカナはひらがなに統一し、かな用の文字処理を適用します。</p>
+            </label>
+            <div class="setting-field" id="customAlphabetField" hidden>
+              <label class="setting-label" for="customAlphabet">使用する文字集合</label>
+              <input class="rule-select" id="customAlphabet" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="例：あいう／アイウ／ABC／abc／0123">
+              <p class="setting-help" id="customAlphabetHelp">入力した文字を1文字ずつそのまま扱います。変換や結合は行いません。</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="settings-section" id="kanaSettingsGroup" aria-label="ひらがなの扱いの指定">
+          <h3 class="settings-section-title">ひらがなの扱いの指定</h3>
+          <div class="settings-grid">
+            <label class="setting-field" for="longRule">
+              <span class="setting-label">伸ばし棒「ー」の処理</span>
+              <select class="rule-select" id="longRule">
+                <option value="trailing">末尾の「ー」だけ無視する</option>
+                <option value="all">すべての「ー」を無視する</option>
+                <option value="vowel" selected>直前の文字の母音として扱う</option>
+              </select>
+              <p class="setting-help" id="longRuleHelp">例：「カレー」→「れ」／「コーヒー」→「ひ」</p>
+            </label>
+            <label class="setting-field" for="dakutenRule">
+              <span class="setting-label">濁点・半濁点の処理</span>
+              <select class="rule-select" id="dakutenRule">
+                <option value="keep" selected>濁点・半濁点付きのまま区別する</option>
+                <option value="remove">濁点・半濁点をすべて消す</option>
+              </select>
+              <p class="setting-help" id="dakutenRuleHelp">例：「が」と「か」、「ぱ」と「は」は別の文字</p>
+            </label>
+            <label class="setting-field" for="smallRule">
+              <span class="setting-label">「っ」以外の小さい文字の処理</span>
+              <select class="rule-select" id="smallRule">
+                <option value="large" selected>大きい文字に置き換える</option>
+                <option value="combine">1つ前の文字と組み合わせる</option>
+              </select>
+              <p class="setting-help" id="smallRuleHelp">例：「フェ」→「ふえ」、または「ふぇ」として扱います。</p>
+            </label>
+            <label class="setting-field" for="tsuRule">
+              <span class="setting-label">小さい「っ」の処理</span>
+              <select class="rule-select" id="tsuRule">
+                <option value="large" selected>大きい「つ」に置き換える</option>
+                <option value="keep">小さい「っ」のまま扱う</option>
+                <option value="combine">1つ前の文字と組み合わせる</option>
+                <option value="remove">すべて消去する</option>
+              </select>
+              <p class="setting-help" id="tsuRuleHelp">「っ」を「つ」にする／直前の文字と一まとまりにする／取り除く、のいずれかを選べます。</p>
+            </label>
+          </div>
+        </section>
+
+        <section class="settings-section" aria-label="禁止条件の指定">
+          <h3 class="settings-section-title">禁止条件の指定</h3>
+          <div class="settings-grid">
+            <label class="setting-field" for="nRule">
+              <span class="setting-label">末尾「ん」禁止</span>
+              <select class="rule-select" id="nRule">
+                <option value="forbid" selected>禁止する</option>
+                <option value="allow">禁止しない</option>
+              </select>
+              <p class="setting-help" id="nRuleHelp">正規化後の末尾が「ん」なら負けます。</p>
+            </label>
+            <label class="setting-field" for="endingRule">
+              <span class="setting-label">禁止条件</span>
+              <select class="rule-select" id="endingRule">
+                <option value="same" selected>1. 同一文字列禁止</option>
+                <option value="prefix">2. 前置部分文字列禁止</option>
+                <option value="suffix">3. 後置部分文字列禁止</option>
+                <option value="substring">4. 部分文字列禁止</option>
+                <option value="subsequence">5. 部分列禁止</option>
+                <option value="idempotent">6. 冪等部分列禁止</option>
+                <option value="commutative">7. 可換部分列禁止</option>
+                <option value="alphabet">8. 使用文字包含禁止</option>
+                <option value="last">9. 末尾文字一致禁止</option>
+                <option value="rightGap">10. 右gap部分列禁止</option>
+                <option value="rightWeakGap">11. 右弱gap部分列禁止</option>
+                <option value="leftGap">12. 左gap部分列禁止</option>
+                <option value="leftWeakGap">13. 左弱gap部分列禁止</option>
+              </select>
+              <p class="setting-help" id="gapRuleHelp" hidden></p>
+            </label>
+            <label class="setting-field" for="reciprocalRule">
+              <span class="setting-label">相互モード</span>
+              <select class="rule-select" id="reciprocalRule">
+                <option value="one-way" selected>通常モード</option>
+                <option value="mutual">相互モード</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section class="settings-section" aria-label="文字列長と接続の制限">
+          <h3 class="settings-section-title">文字列長と接続の制限</h3>
+          <div class="settings-grid">
+            <label class="setting-field" for="minLengthFunction">
+              <span class="setting-label">文字列長の下限</span>
+              <input class="rule-select function-input" id="minLengthFunction" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="空欄：制限なし">
+              <p class="setting-help">第iターン目の正規化後の文字数の下限。例：2、i、i+1</p>
+            </label>
+            <label class="setting-field" for="maxLengthFunction">
+              <span class="setting-label">文字列長の上限</span>
+              <input class="rule-select function-input" id="maxLengthFunction" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="空欄：制限なし">
+              <p class="setting-help">第iターン目の正規化後の文字数の上限。例：10、i+3、2^i、exp(2, i)</p>
+            </label>
+            <label class="setting-field" for="joinLengthFunction">
+              <span class="setting-label">隣接文字列の接続文字数 f(i)</span>
+              <input class="rule-select function-input" id="joinLengthFunction" type="text" inputmode="text" autocomplete="off" spellcheck="false" value="1" placeholder="0：接続制限なし">
+              <p class="setting-help">第iターン目（i≧2）の先頭と、第i−1ターン目の末尾で一致させる文字数。例：0、1、2、i</p>
+            </label>
+          </div>
+          <div class="function-preview" id="functionPreview">iは1始まりのターン番号です。下限・上限は実数値で計算した後、それぞれfloorで整数化します。f(1)は使わず、f(i)は第i−1ターン目と第iターン目の間（i≧2）に適用します。</div>
+          <p class="setting-help" style="margin-top:8px">式では i、+ − * / ^、小数、括弧、min、max、abs、floor、ceil、sqrt、exp(a,b)、log(a,b)、root(a,n)、slog(a) を使用できます。exp(a,b)=a^b、log(a,b)=log_a(b)、root(a,n)=aのn乗根です。slogは底2の反復対数回数（従来のlogstar）です。長さの下限・上限と接続文字数は、実数計算後にfloorで整数化します。式は安全な数式として解析し、JavaScriptコードとしては実行しません。</p>
+          <p class="setting-help">例：下限と上限をどちらも <code>i+1</code>、接続文字数を <code>i</code> にすると、第iターン目はi+1文字で、前ターンの末尾i文字と接続します。</p>
+        </section>
+
+        <p class="settings-lock" id="settingsLock">判定設定は対局開始後に固定されます。変更する場合は「最初からやり直す」を押してください。</p>
+      </section>
+
+      <section class="game-area">
+        <div class="start-panel" id="startPanel">
+          <p class="start-note">プレイヤー名とルールを設定したら、ゲームを開始してください。</p>
+          <button class="start-button" id="startGameButton" type="button">ゲーム開始</button>
+        </div>
+        <div class="demo-controls" id="demoControls" hidden>
+          <p class="demo-note">同一文字列・前置部分文字列・後置部分文字列・部分文字列禁止のお手本プレイです。1回に進められるのは最大1000手です。</p>
+          <button class="demo-button" id="demoNextButton" type="button">次の1手を見る</button>
+          <label class="demo-step-label" for="demoStepCount">続きを見る手数
+            <input class="demo-step-input" id="demoStepCount" type="number" min="1" max="1000" step="1" value="10">
+          </label>
+          <button class="demo-button" id="demoBatchButton" type="button">指定手数だけ進める</button>
+          <p class="demo-status" id="demoStatus" aria-live="polite">開始後に、お手本の続きを再生できます。</p>
+        </div>
+        <div class="turn-panel" aria-live="polite">
+          <div class="turn-caption" id="turnCaption">PLAYER 01 のターン</div>
+          <h2 class="turn-title" id="turnTitle">最初のことばをどうぞ</h2>
+          <p class="turn-description" id="turnDescription">好きなことばから始めましょう。</p>
+        </div>
+
+        <p class="length-range" id="currentLengthRange" aria-live="polite">入力可能な文字列長：制限なし</p>
+        <div class="required-wrap">
+          <span class="required-label" id="requiredLabel">最初の一文字</span>
+          <div class="required-letter first" id="requiredLetter">なんでもOK</div>
+        </div>
+
+        <form class="entry-form" id="wordForm">
+          <input class="word-input" id="wordInput" type="text" inputmode="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="ことばを入力（例：りんご）" aria-label="しりとりのことば">
+          <button class="submit-button" id="submitButton" type="button">決定する →</button>
+        </form>
+        <p class="input-note" id="inputNote">入力文字数に上限はありません。非常に長い文字列では端末性能に応じて処理に時間がかかることがあります。</p>
+        <p class="feedback" id="feedback" role="status"></p>
+
+        <div class="end-panel" id="endPanel" aria-live="polite">
+          <p class="end-title" id="endTitle">ゲーム終了！</p>
+          <p class="end-detail" id="endDetail"></p>
+        </div>
+
+        <div class="toolbar">
+          <button class="sub-button" id="undoButton" type="button" disabled>↶ ひとつ戻す</button>
+          <button class="sub-button" id="resetButton" type="button">最初からやり直す</button>
+        </div>
+      </section>
+
+      <section class="history-section">
+        <div class="history-head">
+          <h2 class="history-title">ことばの記録</h2>
+          <span class="history-count" id="historyCount">0 WORDS</span>
+        </div>
+        <p class="history-note">有効な手は正規化後の文字列を記録します。反則手は赤字で残しますが、接続・長さ・禁止条件の比較やターン数には含めません。</p>
+        <div class="history-list" id="historyList" aria-live="polite">
+          <span class="empty-history">まだことばがありません。最初の一語をどうぞ。</span>
+        </div>
+      </section>
+    </main>
+
+    <div class="warning-overlay" id="nonWqoWarning" hidden>
+      <section class="warning-dialog" role="dialog" aria-modal="true" aria-labelledby="nonWqoWarningTitle" aria-describedby="nonWqoWarningText">
+        <div class="warning-icon" aria-hidden="true">!</div>
+        <h2 id="nonWqoWarningTitle">終了保証についての警告</h2>
+        <p id="nonWqoWarningText">このルールでは有限回で終わることが保証されません。無限に続く悪列が存在する可能性があります。本当に始めますか？</p>
+        <div class="warning-actions">
+          <button class="sub-button" id="cancelWarningButton" type="button">設定に戻る</button>
+          <button class="start-button warning-continue" id="confirmWarningButton" type="button">理解して開始する</button>
+        </div>
+      </section>
+    </div>
+
+    <section class="rules" aria-label="遊び方">
+      <div class="rule"><strong>01　文字を入力</strong><span id="inputGuide">ひらがな・カタカナで入力してください。カタカナは自動でひらがなに統一します。漢字は読みがなに直して入力します。</span></div>
+      <div class="rule"><strong>02　ことばをつなぐ</strong><span id="connectGuide">直前のことばの最後の文字まとまりから始まる読みを入力します。</span></div>
+      <div class="rule"><strong>03　終了条件</strong><span>1人モードでは自分がルール違反をするまで続けます。複数人モードでは反則した人が脱落し、残りの人で続行します。反則手は赤字で記録しますが、悪列には含めません。</span></div>
+    </section>
+    <footer>同じ端末でのお手本生成・1人チャレンジ・2～10人の脱落式対戦 · 単語の辞書判定はありません</footer>
+  </div>
+
+  <script>
+    (() => {
+      const state = {
+        turn: 0,
+        words: [],              // ルール上有効だった単語だけ。ターン数・比較の基準にする。
+        history: [],            // 反則手も含む時系列メモ。
+        playerNames: ['プレイヤー1', 'プレイヤー2'],
+        playerCounts: [0, 0],
+        activePlayers: [true, true],
+        eliminationOrder: [],
+        fastLookup: new Map(),
+        gapMaskBytes: 0,
+        started: false,
+        finished: false,
+        demoBatchRunning: false,
+        loser: null,
+        winner: null,
+        endReason: null,
+        noMoveDetail: null
+      };
+
+      const smallToLarge = {
+        'ぁ':'あ', 'ぃ':'い', 'ぅ':'う', 'ぇ':'え', 'ぉ':'お',
+        'ゃ':'や', 'ゅ':'ゆ', 'ょ':'よ', 'ゎ':'わ',
+        'ゕ':'か', 'ゖ':'け'
+      };
+      const vowelMap = new Map();
+      [
+        ['あいうえお', 'あいうえお'], ['かきくけこ', 'あいうえお'],
+        ['さしすせそ', 'あいうえお'], ['たちつてと', 'あいうえお'],
+        ['なにぬねの', 'あいうえお'], ['はひふへほ', 'あいうえお'],
+        ['まみむめも', 'あいうえお'], ['や　ゆ　よ', 'あいうえお'],
+        ['らりるれろ', 'あいうえお'], ['わ　　　を', 'あいうえお'],
+        ['がぎぐげご', 'あいうえお'], ['ざじずぜぞ', 'あいうえお'],
+        ['だぢづでど', 'あいうえお'], ['ばびぶべぼ', 'あいうえお'],
+        ['ぱぴぷぺぽ', 'あいうえお']
+      ].forEach(([row, vowels]) => {
+        [...row].forEach((ch, i) => { if (ch !== '　' && ch !== ' ') vowelMap.set(ch, vowels[i]); });
+      });
+      vowelMap.set('ゔ', 'う');
+
+      const $ = (id) => document.getElementById(id);
+      const nameOf = (index) => (state.playerNames[index] || '').trim() || `プレイヤー${index + 1}`;
+
+      function toHiragana(value) {
+        return value.normalize('NFC').replace(/[\u30a1-\u30f6]/g, ch =>
+          String.fromCharCode(ch.charCodeAt(0) - 0x60)
+        );
+      }
+      const settingIds = ['characterSet', 'customAlphabet', 'longRule', 'dakutenRule', 'smallRule', 'tsuRule', 'nRule', 'endingRule', 'reciprocalRule', 'minLengthFunction', 'maxLengthFunction', 'joinLengthFunction'];
+      const kanaOnlySettingIds = ['longRule', 'dakutenRule', 'smallRule', 'tsuRule'];
+      const smallOtherKana = new Set(Object.keys(smallToLarge));
+
+      // Gap埋め込みで使う全順序。現代五十音に、歴史的仮名の「ゐ・ゑ」も加える。
+      const HIRAGANA_ORDER = Array.from('あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわゐゑをん');
+      const KATAKANA_ORDER = Array.from('アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヰヱヲン');
+      const UPPER_ORDER = Array.from('ABCDEFGHIJKLMNOPQRSTUVWXYZ');
+      const LOWER_ORDER = Array.from('abcdefghijklmnopqrstuvwxyz');
+      const DIGIT_ORDER = Array.from('0123456789');
+      const GAP_RULES = new Set(['rightGap', 'rightWeakGap', 'leftGap', 'leftWeakGap']);
+      const reciprocalApplicable = new Set(['prefix', 'suffix', 'substring', 'subsequence', 'idempotent', 'commutative', 'alphabet', 'rightGap', 'rightWeakGap', 'leftGap', 'leftWeakGap']);
+      const nonWqoEndings = new Set(['same', 'prefix', 'suffix', 'substring']);
+      const gapMaskCacheLimit = 64 * 1024 * 1024;
+      const gapMaskHardLimit = 128 * 1024 * 1024;
+
+      const customAlphabetKinds = [
+        { kind: 'hiragana', label: 'ひらがな', order: HIRAGANA_ORDER },
+        { kind: 'katakana', label: 'カタカナ', order: KATAKANA_ORDER },
+        { kind: 'uppercase', label: '大文字アルファベット', order: UPPER_ORDER },
+        { kind: 'lowercase', label: '小文字アルファベット', order: LOWER_ORDER },
+        { kind: 'digits', label: '数字', order: DIGIT_ORDER }
+      ];
+
+      function classifyCustomAlphabet(value) {
+        const chars = [...new Set(Array.from(value))];
+        if (!chars.length) return { valid: false, message: '使用する文字集合を入力してください。' };
+        const matched = customAlphabetKinds.find(group => {
+          const allowed = new Set(group.order);
+          return chars.every(ch => allowed.has(ch));
+        });
+        if (!matched) {
+          return {
+            valid: false,
+            message: '文字集合は「濁点・半濁点・小文字・伸ばし棒を除くひらがな／カタカナ」「大文字のみ／小文字のみのA～Z」「数字」のいずれか1種類にしてください。'
+          };
+        }
+        return { valid: true, ...matched, chars };
+      }
+
+      function getGapOrderInfo(rules, customSpec = null) {
+        let order;
+        if (rules.characterSet === 'hiragana') order = HIRAGANA_ORDER;
+        else if (rules.characterSet === 'latin') order = UPPER_ORDER;
+        else if (rules.characterSet === 'digits') order = DIGIT_ORDER;
+        else {
+          const spec = customSpec || classifyCustomAlphabet(rules.customAlphabet);
+          if (!spec.valid) return spec;
+          order = spec.order;
+        }
+        return { valid: true, order, rankMap: new Map(order.map((ch, index) => [ch, index])) };
+      }
+
+      function isGapRule(rule) { return GAP_RULES.has(rule); }
+
+      function currentRules() {
+        return {
+          characterSet: $('characterSet').value,
+          customAlphabet: $('customAlphabet').value,
+          long: $('longRule').value,
+          dakuten: $('dakutenRule').value,
+          small: $('smallRule').value,
+          tsu: $('tsuRule').value,
+          n: $('nRule').value,
+          ending: $('endingRule').value,
+          reciprocal: $('reciprocalRule').value,
+          minLengthFunction: $('minLengthFunction').value.trim(),
+          maxLengthFunction: $('maxLengthFunction').value.trim(),
+          joinLengthFunction: $('joinLengthFunction').value.trim()
+        };
+      }
+      // 関数入力はJavaScriptとして実行せず、実数式の字句解析・構文解析を行う。
+      // iは1始まりのターン番号。Number（IEEE 754倍精度浮動小数点数）で評価し、
+      // 長さ・接続文字数に使う際にfloorを適用してBigIntへ変換する。
+      const expressionCache = new Map();
+      const MAX_EXPRESSION_CHARS = 256;
+      const MAX_EXPRESSION_TOKENS = 256;
+      const MAX_EXPRESSION_DEPTH = 64;
+
+      function tokenizeRealExpression(source) {
+        if (!source || source.length > MAX_EXPRESSION_CHARS) throw new Error('式は256文字以内で入力してください。');
+        const tokens = [];
+        let pos = 0;
+        while (pos < source.length) {
+          if (/\s/.test(source[pos])) { pos++; continue; }
+          const rest = source.slice(pos);
+          const number = rest.match(/^(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?/);
+          if (number) {
+            const value = Number(number[0]);
+            if (!Number.isFinite(value)) throw new Error(`数値「${number[0]}」が大きすぎます。`);
+            tokens.push({ type: 'number', value });
+            pos += number[0].length;
+          } else {
+            const ident = rest.match(/^[A-Za-z_][A-Za-z0-9_]*/);
+            if (ident) {
+              tokens.push({ type: 'identifier', value: ident[0] });
+              pos += ident[0].length;
+            } else if ('+-*/^(),'.includes(source[pos])) {
+              tokens.push({ type: source[pos], value: source[pos] });
+              pos++;
+            } else {
+              throw new Error(`使用できない記号「${source[pos]}」があります。`);
+            }
+          }
+          if (tokens.length > MAX_EXPRESSION_TOKENS) throw new Error('式が複雑すぎます。');
+        }
+        tokens.push({ type: 'eof', value: '' });
+        return tokens;
+      }
+
+      function parseRealExpression(source) {
+        const tokens = tokenizeRealExpression(source);
+        let index = 0;
+        let depth = 0;
+        const peek = () => tokens[index];
+        const take = (type) => {
+          if (peek().type !== type) throw new Error(`「${type}」が必要です。`);
+          return tokens[index++];
+        };
+        const parsePrimary = () => {
+          if (++depth > MAX_EXPRESSION_DEPTH) throw new Error('式の入れ子が深すぎます。');
+          let node;
+          if (peek().type === 'number') {
+            node = { type: 'number', value: take('number').value };
+          } else if (peek().type === 'identifier') {
+            const name = take('identifier').value;
+            if (peek().type === '(') {
+              take('(');
+              const args = [];
+              if (peek().type !== ')') {
+                args.push(parseAdditive());
+                while (peek().type === ',') { take(','); args.push(parseAdditive()); }
+              }
+              take(')');
+              const unary = new Set(['abs', 'floor', 'ceil', 'sqrt', 'slog', 'log2']);
+              const binary = new Set(['exp', 'log', 'root']);
+              if (unary.has(name) && args.length !== 1) throw new Error(`${name}() は引数を1つ指定してください。`);
+              if (binary.has(name) && args.length !== 2) throw new Error(`${name}() は引数を2つ指定してください。`);
+              if ((name === 'min' || name === 'max') && args.length < 2) throw new Error(`${name}() は引数を2つ以上指定してください。`);
+              if (!unary.has(name) && !binary.has(name) && name !== 'min' && name !== 'max') throw new Error(`未対応の関数「${name}」です。`);
+              node = { type: 'call', name, args };
+            } else if (name === 'i') {
+              node = { type: 'variable' };
+            } else {
+              throw new Error(`未対応の変数「${name}」です。変数は i です。`);
+            }
+          } else if (peek().type === '(') {
+            take('(');
+            node = parseAdditive();
+            take(')');
+          } else {
+            throw new Error('数値、i、関数、または括弧から式を始めてください。');
+          }
+          depth--;
+          return node;
+        };
+        const parsePower = () => {
+          const left = parsePrimary();
+          if (peek().type === '^') { take('^'); return { type: 'binary', op: '^', left, right: parseUnary() }; }
+          return left;
+        };
+        const parseUnary = () => {
+          if (peek().type === '+' || peek().type === '-') {
+            const op = tokens[index++].type;
+            return { type: 'unary', op, value: parseUnary() };
+          }
+          return parsePower();
+        };
+        const parseMultiplicative = () => {
+          let node = parseUnary();
+          while (peek().type === '*' || peek().type === '/') {
+            const op = tokens[index++].type;
+            node = { type: 'binary', op, left: node, right: parseUnary() };
+          }
+          return node;
+        };
+        const parseAdditive = () => {
+          let node = parseMultiplicative();
+          while (peek().type === '+' || peek().type === '-') {
+            const op = tokens[index++].type;
+            node = { type: 'binary', op, left: node, right: parseMultiplicative() };
+          }
+          return node;
+        };
+        const ast = parseAdditive();
+        if (peek().type !== 'eof') throw new Error(`式の末尾に予期しない「${peek().value}」があります。`);
+        return ast;
+      }
+
+      function checkedReal(value) {
+        if (!Number.isFinite(value)) throw new Error('計算結果が実数の範囲を超えています。底・指数・対数の引数を確認してください。');
+        return value;
+      }
+      function stableFloor(value) {
+        const nearestInteger = Math.round(value);
+        const tolerance = Number.EPSILON * 4 * Math.max(1, Math.abs(value));
+        return Math.floor(Math.abs(value - nearestInteger) <= tolerance ? nearestInteger : value);
+      }
+      function stableCeil(value) {
+        return -stableFloor(-value);
+      }
+      function approximateRational(value, maxDenominator = 1000000) {
+        // IEEE 754の小数を、分母が小さい有理数として十分近似できるか調べる。
+        // 例：0.3333333333333333 -> 1/3。負の底の実数冪で利用する。
+        const sign = value < 0 ? -1 : 1;
+        let x = Math.abs(value);
+        let h0 = 0, h1 = 1, k0 = 1, k1 = 0;
+        for (let iteration = 0; iteration < 64; iteration++) {
+          const a = Math.floor(x);
+          const h2 = a * h1 + h0;
+          const k2 = a * k1 + k0;
+          if (k2 > maxDenominator || !Number.isSafeInteger(h2) || !Number.isSafeInteger(k2)) break;
+          const approximation = h2 / k2;
+          if (Math.abs(approximation - Math.abs(value)) <= 1e-12 * Math.max(1, Math.abs(value))) {
+            return { numerator: sign * h2, denominator: k2 };
+          }
+          const fraction = x - a;
+          if (fraction < Number.EPSILON) break;
+          h0 = h1; h1 = h2; k0 = k1; k1 = k2;
+          x = 1 / fraction;
+        }
+        return null;
+      }
+      function realPower(base, exponent) {
+        if (base === 0 && exponent < 0) throw new Error('0の負のべき乗は定義できません。');
+        if (base < 0 && !Number.isInteger(exponent)) {
+          const rational = approximateRational(exponent);
+          if (!rational || rational.denominator % 2 === 0) {
+            throw new Error('負の底を小数乗する場合、指数は分母が奇数の有理数である必要があります。');
+          }
+          const magnitude = Math.pow(-base, exponent);
+          return checkedReal(Math.abs(rational.numerator) % 2 === 1 ? -magnitude : magnitude);
+        }
+        return checkedReal(Math.pow(base, exponent));
+      }
+      function evaluateRealAst(node, turnNumber) {
+        if (node.type === 'number') return node.value;
+        if (node.type === 'variable') return turnNumber;
+        if (node.type === 'unary') {
+          const value = evaluateRealAst(node.value, turnNumber);
+          return checkedReal(node.op === '-' ? -value : value);
+        }
+        if (node.type === 'binary') {
+          const a = evaluateRealAst(node.left, turnNumber);
+          const b = evaluateRealAst(node.right, turnNumber);
+          if (node.op === '+') return checkedReal(a + b);
+          if (node.op === '-') return checkedReal(a - b);
+          if (node.op === '*') return checkedReal(a * b);
+          if (node.op === '/') {
+            if (b === 0) throw new Error('0で割ることはできません。');
+            return checkedReal(a / b);
+          }
+          return realPower(a, b);
+        }
+        const values = node.args.map(arg => evaluateRealAst(arg, turnNumber));
+        if (node.name === 'min') return Math.min(...values);
+        if (node.name === 'max') return Math.max(...values);
+        const value = values[0];
+        if (node.name === 'abs') return Math.abs(value);
+        if (node.name === 'floor') return stableFloor(value);
+        if (node.name === 'ceil') return stableCeil(value);
+        if (node.name === 'sqrt') {
+          if (value < 0) throw new Error('sqrt() の引数は0以上にしてください。');
+          return Math.sqrt(value);
+        }
+        if (node.name === 'exp') return realPower(value, values[1]);
+        if (node.name === 'log' || node.name === 'log2') {
+          const base = node.name === 'log2' ? 2 : value;
+          const argument = node.name === 'log2' ? value : values[1];
+          if (base <= 0 || base === 1) throw new Error('log() の底は0より大きく、1以外にしてください。');
+          if (argument <= 0) throw new Error('log() の真数は0より大きくしてください。');
+          return checkedReal(Math.log(argument) / Math.log(base));
+        }
+        if (node.name === 'root') {
+          const degree = values[1];
+          if (degree <= 0) throw new Error('root() の根の次数は0より大きくしてください。');
+          if (value < 0) {
+            if (!Number.isInteger(degree) || degree % 2 === 0) throw new Error('負の数の実数範囲での根は、正の奇数次数だけ指定できます。');
+            return checkedReal(-Math.pow(-value, 1 / degree));
+          }
+          return checkedReal(Math.pow(value, 1 / degree));
+        }
+        if (node.name === 'slog') {
+          if (value < 0) throw new Error('slog() の引数は0以上にしてください。');
+          let current = value;
+          let count = 0;
+          while (current > 1) {
+            current = Math.log2(current);
+            count++;
+            if (count > 2048) throw new Error('slog() の反復回数が上限を超えました。');
+          }
+          return count;
+        }
+        throw new Error('未対応の関数です。');
+      }
+      function evaluateRuleFunction(expression, turnNumber, label, blankValue = null) {
+        if (!expression) return blankValue;
+        let ast = expressionCache.get(expression);
+        if (!ast) {
+          ast = parseRealExpression(expression);
+          if (expressionCache.size >= 100) expressionCache.delete(expressionCache.keys().next().value);
+          expressionCache.set(expression, ast);
+        }
+        const realResult = checkedReal(evaluateRealAst(ast, turnNumber));
+        // 文字数・接続数は整数なので、実数計算後にfloorで整数化する。
+        // logやrootの結果が数学的な整数から数ULPだけずれる場合は、浮動小数点誤差を補正してからfloorする。
+        const floored = stableFloor(realResult);
+        if (floored < 0) throw new Error(`${label}の値は0以上にしてください（第${turnNumber}ターン目）。`);
+        return BigInt(floored);
+      }
+      function expressionContainsTurnVariable(node) {
+        if (!node) return false;
+        if (node.type === 'variable') return true;
+        if (node.type === 'unary') return expressionContainsTurnVariable(node.value);
+        if (node.type === 'binary') return expressionContainsTurnVariable(node.left) || expressionContainsTurnVariable(node.right);
+        if (node.type === 'call') return node.args.some(expressionContainsTurnVariable);
+        return false;
+      }
+      function isConstantExpression(expression) {
+        if (!expression || !expression.trim()) return true;
+        const ast = expressionCache.get(expression) || parseRealExpression(expression);
+        return !expressionContainsTurnVariable(ast);
+      }
+      function maxBigInt(...values) { return values.reduce((a, b) => a > b ? a : b, 0n); }
+      function readLengthBounds(rules, turnNumber) {
+        const min = evaluateRuleFunction(rules.minLengthFunction, turnNumber, '下限');
+        const max = evaluateRuleFunction(rules.maxLengthFunction, turnNumber, '上限');
+        if (min !== null && max !== null && min > max) {
+          return { min, max, impossible: `第${turnNumber}ターン目は下限が上限を超えているため、入力できる文字列長がありません。` };
+        }
+        return { min, max, impossible: null };
+      }
+      function readNextTurnAvailability(rules, nextTurnNumber, previousUnits, overlapCount) {
+        const bounds = readLengthBounds(rules, nextTurnNumber);
+        if (bounds.impossible) return { possible: false, reason: bounds.impossible, overlapNumber: 0 };
+        if (overlapCount > BigInt(previousUnits.length)) {
+          return {
+            possible: false,
+            reason: `直前の文字列が${overlapCount}文字より短いため、第${nextTurnNumber}ターン目に必要な接続を作れません。`,
+            overlapNumber: 0
+          };
+        }
+        const requiredMin = maxBigInt(bounds.min === null ? 1n : bounds.min, overlapCount, 1n);
+        if (bounds.max !== null && requiredMin > bounds.max) {
+          return {
+            possible: false,
+            reason: `第${nextTurnNumber}ターン目は、接続に必要な${overlapCount}文字と長さ上限を同時に満たせる文字列がありません。`,
+            overlapNumber: 0
+          };
+        }
+        const count = Number(overlapCount);
+        const requiredPrefix = count === 0 ? '' : previousUnits.slice(previousUnits.length - count).join('');
+        return { possible: true, requiredPrefix, overlapNumber: count };
+      }
+
+      function compareTailPrefix(previousUnits, currentUnits, overlapCount) {
+        if (overlapCount === 0n) return true;
+        if (overlapCount > BigInt(previousUnits.length) || overlapCount > BigInt(currentUnits.length)) return false;
+        const count = Number(overlapCount);
+        const start = previousUnits.length - count;
+        for (let i = 0; i < count; i++) if (previousUnits[start + i] !== currentUnits[i]) return false;
+        return true;
+      }
+
+      function normalizeDakuten(word, rules) {
+        if (rules.dakuten !== 'remove') return word;
+        return word.normalize('NFD').replace(/[\u3099\u309a]/g, '').normalize('NFC');
+      }
+      function expandSmallKana(word) {
+        return word.replace(/[ぁぃぅぇぉゃゅょゎゕゖ]/g, ch => smallToLarge[ch] || ch);
+      }
+      function vowelOf(ch) {
+        const large = smallToLarge[ch] || ch;
+        return vowelMap.get(large) || '';
+      }
+      function replaceLongMarksWithVowels(word) {
+        let result = '';
+        let previousChar = '';
+        for (const ch of word) {
+          if (ch === 'ー') {
+            // 直前が「っ」「ん」ならそれを引き継ぐ。それ以外は直前の仮名の母音にする。
+            // 置換後の文字も previousChar に保存するため、連続する「ー」にも同じ規則が働く。
+            const replacement = (previousChar === 'っ' || previousChar === 'ん')
+              ? previousChar
+              : (vowelOf(previousChar) || 'ー');
+            result += replacement;
+            previousChar = replacement;
+            continue;
+          }
+          result += ch;
+          previousChar = ch;
+        }
+        return result;
+      }
+      function normalizeWord(word, rules) {
+        // ラテンアルファベットはASCIIのa-zをA-Zに統一する。
+        // ユーザー定義では一切変換せず、入力された文字列をそのまま返す。
+        if (rules.characterSet === 'latin') return word.toUpperCase();
+        if (rules.characterSet === 'digits' || rules.characterSet === 'custom') return word;
+
+        let text = toHiragana(word);
+
+        // 伸ばし棒の処理を先に行う。「っー」を「っっ」にしてから、後段で「っ」の設定を適用する。
+        if (rules.long === 'trailing' && text.endsWith('ー')) {
+          text = text.slice(0, -1);
+        } else if (rules.long === 'all') {
+          text = text.replace(/ー/g, '');
+        } else if (rules.long === 'vowel') {
+          text = replaceLongMarksWithVowels(text);
+        }
+
+        // 「っ」の変換・消去は伸ばし棒の展開後にまとめて行う。
+        if (rules.tsu === 'large') text = text.replace(/っ/g, 'つ');
+        else if (rules.tsu === 'remove') text = text.replace(/っ/g, '');
+
+        // ここでは「っ」以外の小さい文字だけを処理する。
+        if (rules.small === 'large') text = expandSmallKana(text);
+        text = normalizeDakuten(text, rules);
+        return text;
+      }
+      function isCombiningSmall(ch, rules) {
+        if (ch === 'っ') return rules.tsu === 'combine';
+        return smallOtherKana.has(ch) && rules.small === 'combine';
+      }
+      function kanaUnits(normalizedWord, rules) {
+        const units = [];
+        for (const ch of normalizedWord) {
+          if (isCombiningSmall(ch, rules) && units.length) units[units.length - 1] += ch;
+          else units.push(ch);
+        }
+        return units;
+      }
+      // 以下の比較はすべて、正規化後の「文字まとまり」（kanaUnits）を単位に行う。
+      const sameUnits = (a, b) => a.length === b.length && a.every((unit, i) => unit === b[i]);
+      const isPrefix = (a, b) => a.length <= b.length && a.every((unit, i) => unit === b[i]);
+      const isSuffix = (a, b) => a.length <= b.length && a.every((unit, i) => unit === b[b.length - a.length + i]);
+      // KMPの失敗関数。部分文字列探索を O(|pattern| + |text|) で行う。
+      function buildKmpTable(pattern) {
+        const table = new Uint32Array(pattern.length);
+        let matched = 0;
+        for (let i = 1; i < pattern.length;) {
+          if (pattern[i] === pattern[matched]) {
+            table[i++] = ++matched;
+          } else if (matched > 0) {
+            matched = table[matched - 1];
+          } else {
+            table[i++] = 0;
+          }
+        }
+        return table;
+      }
+      function isSubstring(pattern, text, table) {
+        if (pattern.length === 0) return true;
+        if (pattern.length > text.length) return false;
+        const failure = table || buildKmpTable(pattern);
+        let matched = 0;
+        for (const unit of text) {
+          while (matched > 0 && unit !== pattern[matched]) matched = failure[matched - 1];
+          if (unit === pattern[matched]) matched++;
+          if (matched === pattern.length) return true;
+        }
+        return false;
+      }
+      // 部分列は貪欲法で十分。各文字を左から一度ずつ調べる O(|a| + |b|)。
+      function isSubsequence(pattern, text) {
+        let matched = 0;
+        for (let i = 0; i < text.length && matched < pattern.length; i++) {
+          if (pattern[matched] === text[i]) matched++;
+        }
+        return matched === pattern.length;
+      }
+
+      // Gap部分列のDPをビット並列化したもの。
+      // 状態iは「patternの先頭i文字を埋め込めた」ことを表す。
+      // textの文字cを読み込むと、pattern[i] <= c の状態はgapとして読み飛ばせ、
+      // pattern[i] === c の状態は次の状態i+1へ進める。
+      // 右弱gapでは先頭gapに制約がないため、状態0を常に残す。
+      function buildGapMaskData(patternRanks, alphabetSize) {
+        const wordCount = Math.ceil(patternRanks.length / 32);
+        const byteLength = alphabetSize * wordCount * Uint32Array.BYTES_PER_ELEMENT;
+        if (!Number.isSafeInteger(byteLength) || byteLength > gapMaskHardLimit) {
+          const error = new Error('gap比較用データが安全なメモリ上限を超えています。');
+          error.code = 'GAP_MASK_LIMIT';
+          throw error;
+        }
+        const masks = Array.from({ length: alphabetSize }, () => new Uint32Array(wordCount));
+        for (let i = 0; i < patternRanks.length; i++) {
+          masks[patternRanks[i]][i >>> 5] |= (1 << (i & 31));
+        }
+        // masks[r]を「pattern文字の順位がr以下」の累積マスクにする。
+        for (let r = 1; r < alphabetSize; r++) {
+          const current = masks[r];
+          const previous = masks[r - 1];
+          for (let w = 0; w < wordCount; w++) current[w] |= previous[w];
+        }
+        return {
+          masks,
+          wordCount,
+          patternLength: patternRanks.length,
+          byteLength
+        };
+      }
+
+      function getGapMaskData(data) {
+        if (data.gapMaskData) return data.gapMaskData;
+        const built = buildGapMaskData(data.gapRanks, data.gapAlphabetSize);
+        if (state.gapMaskBytes + built.byteLength <= gapMaskCacheLimit) {
+          data.gapMaskData = built;
+          state.gapMaskBytes += built.byteLength;
+        }
+        return built;
+      }
+
+      function isRightGapSubsequence(patternRanks, textRanks, maskData, weak = false) {
+        const m = patternRanks.length;
+        const n = textRanks.length;
+        if (m === 0) return true;
+        if (m > n) return false;
+        let masks = maskData;
+        if (!masks) {
+          let maxRank = 0;
+          for (let i = 0; i < patternRanks.length; i++) if (patternRanks[i] > maxRank) maxRank = patternRanks[i];
+          masks = buildGapMaskData(patternRanks, maxRank + 1);
+        }
+        const maskWords = masks.wordCount;
+        const stateWords = Math.ceil((m + 1) / 32);
+        let active = new Uint32Array(stateWords);
+        let next = new Uint32Array(stateWords);
+        active[0] = 1; // patternの先頭0文字を埋め込んだ初期状態
+
+        for (let t = 0; t < n; t++) {
+          const rank = textRanks[t];
+          if (rank >= masks.masks.length) return false;
+          const lessOrEqual = masks.masks[rank];
+          const less = rank === 0 ? null : masks.masks[rank - 1];
+          let carry = 0;
+          for (let w = 0; w < maskWords; w++) {
+            const current = active[w];
+            const equalMask = less ? (lessOrEqual[w] ^ less[w]) : lessOrEqual[w];
+            const advance = current & equalMask;
+            next[w] = ((current & lessOrEqual[w]) | ((advance << 1) >>> 0) | carry) >>> 0;
+            carry = advance >>> 31;
+          }
+          // pattern長が32の倍数なら、最終状態は追加のwordに入る。
+          if (stateWords > maskWords) next[maskWords] = carry;
+          if (weak) next[0] |= 1; // 右弱gapでは最初の像より前のgapは自由
+
+          const acceptWord = m >>> 5;
+          const acceptBit = 1 << (m & 31);
+          if ((next[acceptWord] & acceptBit) !== 0) return true;
+
+          const swap = active;
+          active = next;
+          next = swap;
+          next.fill(0);
+        }
+        return false;
+      }
+
+      function reverseRanks(ranks) {
+        const reversed = new Uint8Array(ranks.length);
+        for (let i = 0; i < ranks.length; i++) reversed[i] = ranks[ranks.length - 1 - i];
+        return reversed;
+      }
+
+      function compressRuns(units) {
+        if (!units.length) return [];
+        const result = [units[0]];
+        for (let i = 1; i < units.length; i++) {
+          if (units[i] !== units[i - 1]) result.push(units[i]);
+        }
+        return result;
+      }
+      function counts(units) {
+        const result = new Map();
+        for (const unit of units) result.set(unit, (result.get(unit) || 0) + 1);
+        return result;
+      }
+      function multisetIncludes(aCounts, bCounts) {
+        for (const [unit, count] of aCounts) {
+          if ((bCounts.get(unit) || 0) < count) return false;
+        }
+        return true;
+      }
+      function alphabetIncludes(aSet, bSet) {
+        for (const unit of aSet) if (!bSet.has(unit)) return false;
+        return true;
+      }
+      // 各単語の比較用データは登録時に一度だけ作る。設定は対局中固定される。
+      function prepareComparisonData(memo, rules, gapInfo = null) {
+        // かなモードだけ小文字の結合設定を反映する。それ以外はコードポイント単位で厳密に比較する。
+        const units = rules.characterSet === 'hiragana' ? kanaUnits(memo, rules) : Array.from(memo);
+        const data = { units };
+        if (gapInfo) {
+          const ranks = new Uint8Array(units.length);
+          for (let i = 0; i < units.length; i++) ranks[i] = gapInfo.rankMap.get(units[i]);
+          data.gapRanks = (rules.ending === 'leftGap' || rules.ending === 'leftWeakGap') ? reverseRanks(ranks) : ranks;
+          data.gapAlphabetSize = gapInfo.order.length;
+        }
+        switch (rules.ending) {
+          case 'substring':
+            data.kmpTable = buildKmpTable(units);
+            break;
+          case 'idempotent':
+            data.compressedUnits = compressRuns(units);
+            break;
+          case 'commutative':
+            data.unitCounts = counts(units);
+            break;
+          case 'alphabet':
+            data.alphabetSet = new Set(units);
+            break;
+        }
+        return data;
+      }
+      function violatesEndingRule(existingEntry, newData, rules) {
+        const a = existingEntry.units;
+        const b = newData.units;
+        let forward = false;
+        let reverse = false;
+        switch (rules.ending) {
+          case 'same':
+            return sameUnits(a, b);
+          case 'prefix':
+            forward = isPrefix(a, b);
+            reverse = isPrefix(b, a);
+            break;
+          case 'suffix':
+            forward = isSuffix(a, b);
+            reverse = isSuffix(b, a);
+            break;
+          case 'substring':
+            forward = isSubstring(a, b, existingEntry.kmpTable);
+            reverse = rules.reciprocal === 'mutual' && isSubstring(b, a, newData.kmpTable);
+            break;
+          case 'subsequence':
+            forward = isSubsequence(a, b);
+            reverse = rules.reciprocal === 'mutual' && isSubsequence(b, a);
+            break;
+          case 'idempotent':
+            forward = isSubsequence(existingEntry.compressedUnits, newData.compressedUnits);
+            reverse = rules.reciprocal === 'mutual' && isSubsequence(newData.compressedUnits, existingEntry.compressedUnits);
+            break;
+          case 'commutative':
+            forward = multisetIncludes(existingEntry.unitCounts, newData.unitCounts);
+            reverse = rules.reciprocal === 'mutual' && multisetIncludes(newData.unitCounts, existingEntry.unitCounts);
+            break;
+          case 'alphabet':
+            forward = alphabetIncludes(existingEntry.alphabetSet, newData.alphabetSet);
+            reverse = rules.reciprocal === 'mutual' && alphabetIncludes(newData.alphabetSet, existingEntry.alphabetSet);
+            break;
+          case 'rightGap':
+          case 'rightWeakGap':
+          case 'leftGap':
+          case 'leftWeakGap': {
+            // 長さが等しい場合、埋め込みは位置ごとの完全一致に限られる。
+            if (a.length === b.length) return sameUnits(a, b);
+            const weak = rules.ending === 'rightWeakGap' || rules.ending === 'leftWeakGap';
+            const existingMasks = getGapMaskData(existingEntry);
+            forward = isRightGapSubsequence(existingEntry.gapRanks, newData.gapRanks, existingMasks, weak);
+            if (rules.reciprocal === 'mutual') {
+              const newMasks = getGapMaskData(newData);
+              reverse = isRightGapSubsequence(newData.gapRanks, existingEntry.gapRanks, newMasks, weak);
+            }
+            break;
+          }
+          case 'last':
+            return a.length > 0 && b.length > 0 && a[a.length - 1] === b[b.length - 1];
+          default:
+            return false;
+        }
+        return forward || reverse;
+      }
+      function findConflictingEntry(newData, newMemo, rules) {
+        // 完全一致と末尾一致は索引で平均 O(1) に調べる。
+        if (rules.ending === 'same') return state.fastLookup.get(newMemo) || null;
+        if (rules.ending === 'last') {
+          const last = newData.units[newData.units.length - 1] || '';
+          return state.fastLookup.get(last) || null;
+        }
+        // それ以外は履歴を古い順に調べ、最初に該当した文字列を返す。
+        for (const entry of state.words) {
+          if (violatesEndingRule(entry, newData, rules)) return entry;
+        }
+        return null;
+      }
+      function formatLengthRange(min, max) {
+        if (min === null && max === null) return '制限なし';
+        if (min !== null && max !== null) return min === max ? `${min}文字` : `${min}～${max}文字`;
+        if (min !== null) return `${min}文字以上`;
+        return `${max}文字以下`;
+      }
+      function getCurrentTurnLengthRange(rules, turnNumber) {
+        const bounds = readLengthBounds(rules, turnNumber);
+        if (bounds.impossible) return { possible: false, reason: bounds.impossible };
+        const overlap = turnNumber > 1
+          ? evaluateRuleFunction(rules.joinLengthFunction, turnNumber, '接続文字数', 0n)
+          : 0n;
+        const previous = turnNumber > 1 ? state.words[state.words.length - 1] : null;
+        const effectiveOverlap = isDemoMode() && previous && overlap > BigInt(previous.units.length)
+          ? BigInt(previous.units.length)
+          : overlap;
+        if (previous && effectiveOverlap > BigInt(previous.units.length)) {
+          return { possible: false, reason: `直前の文字列が接続に必要な${effectiveOverlap}文字より短いため、入力できません。` };
+        }
+        const effectiveMin = maxBigInt(bounds.min === null ? 1n : bounds.min, effectiveOverlap, 1n);
+        const max = bounds.max;
+        if (max !== null && effectiveMin > max) {
+          return { possible: false, reason: `接続条件と長さ上限を同時に満たせません（最低${effectiveMin}文字、上限${max}文字）。` };
+        }
+        const hasExplicitOrJoinMinimum = bounds.min !== null || overlap > 0n;
+        return { possible: true, min: bounds.min, max: bounds.max, effectiveMin: hasExplicitOrJoinMinimum ? effectiveMin : null, overlap: effectiveOverlap };
+      }
+      function updateCurrentTurnLengthRange(rules, turnNumber) {
+        const rangeElement = $('currentLengthRange');
+        if (state.finished) {
+          rangeElement.classList.remove('error');
+          rangeElement.textContent = 'ゲーム終了';
+          return;
+        }
+        try {
+          const range = getCurrentTurnLengthRange(rules, turnNumber);
+          if (!range.possible) {
+            rangeElement.classList.add('error');
+            rangeElement.textContent = `このターンに入力できる長さはありません：${range.reason}`;
+            return;
+          }
+          rangeElement.classList.remove('error');
+          rangeElement.textContent = `第${turnNumber}ターン目の入力可能な長さ：${formatLengthRange(range.effectiveMin, range.max)}`;
+        } catch (error) {
+          rangeElement.classList.add('error');
+          rangeElement.textContent = `長さ制限を計算できません：${error.message}`;
+        }
+      }
+      function describeConstraintFunctions() {
+        const preview = $('functionPreview');
+        const rules = currentRules();
+        const i = state.words.length + 1;
+        try {
+          const currentBounds = readLengthBounds(rules, i);
+          const overlap = i === 1 ? 0n : evaluateRuleFunction(rules.joinLengthFunction, i, '接続文字数', 0n);
+          const nextOverlap = evaluateRuleFunction(rules.joinLengthFunction, i + 1, '接続文字数', 0n);
+          const currentMin = currentBounds.min === null ? 'なし' : currentBounds.min.toString();
+          const currentMax = currentBounds.max === null ? 'なし' : currentBounds.max.toString();
+          preview.classList.remove('error');
+          preview.textContent = `現在は第${i}ターン目：下限 ${currentMin}、上限 ${currentMax}（いずれも実数評価後にfloor）。${i === 1 ? '初手のため' : `前の単語と`} ${overlap} 文字を接続します。次ターンの接続文字数は ${nextOverlap} 文字です。iは1始まり。`;
+        } catch (error) {
+          preview.classList.add('error');
+          preview.textContent = `関数式を確認してください：${error.message}`;
+        }
+        updateCurrentTurnLengthRange(rules, i);
+      }
+
+      function describeRules() {
+        const rules = currentRules();
+        const kanaMode = rules.characterSet === 'hiragana';
+        $('customAlphabetField').hidden = rules.characterSet !== 'custom';
+        $('kanaSettingsGroup').hidden = !kanaMode;
+        $('characterSetHelp').textContent = rules.characterSet === 'hiragana'
+          ? 'カタカナはひらがなに統一し、かな用の文字処理を適用します。'
+          : rules.characterSet === 'latin'
+            ? 'A～Z・a～zを受け付け、小文字は大文字に統一します。使用する文字はラテンアルファベット26種です。'
+            : rules.characterSet === 'digits'
+              ? '半角数字の0～9だけを使用します。先頭の0を含め、入力した数字をそのまま扱います。'
+              : '入力した文字をUnicodeコードポイント単位でそのまま扱います。大小文字・濁点などの変換や、複数コードポイントの結合は行いません。';
+        const customSpec = classifyCustomAlphabet(rules.customAlphabet);
+        $('customAlphabetHelp').textContent = customSpec.valid
+          ? `有効な${customSpec.label}の文字集合です。重複文字は1つとして扱い、順序は標準の${customSpec.kind === 'hiragana' || customSpec.kind === 'katakana' ? '五十音順' : '文字順'}を使います。`
+          : customSpec.message;
+        $('inputGuide').textContent = rules.characterSet === 'hiragana'
+          ? 'ひらがな・カタカナで入力してください。カタカナはひらがなに統一します。漢字は読みがなに直して入力します。'
+          : rules.characterSet === 'latin'
+            ? 'A～Zまたはa～zを入力してください。小文字は大文字に統一して記録します。'
+            : rules.characterSet === 'digits'
+              ? '半角数字の0～9だけを入力してください。'
+              : '設定した文字集合に含まれる文字を入力してください。入力文字列は変換せず、そのまま記録します。';
+        $('connectGuide').textContent = '第iターン目の先頭f(i)文字と、第i−1ターン目の末尾f(i)文字を一致させます。f(i)=0なら接続制限はありません。';
+        const longHelp = {
+          trailing: '例：「カレー」→「れ」。末尾の「ー」1つだけを取り除きます。',
+          all: '例：「コーヒー」→「ひ」。単語の中にある「ー」もすべて取り除きます。',
+          vowel: '例：「コーヒーー」→「こおひいい」。直前が「っ」「ん」ならそれぞれ「っ」「ん」に変換し、連続する「ー」にも適用します。'
+        };
+        const dakutenHelp = {
+          keep: '例：「が」と「か」、「ぱ」と「は」は別の文字として扱います。',
+          remove: '例：「が」→「か」、「ぱ」→「は」。濁点・半濁点を取り除きます。'
+        };
+        const smallHelp = {
+          large: '例：「フェ」→「ふえ」。小さい「っ」以外を大きい文字に置き換えます。',
+          combine: '例：「カフェ」の末尾「ふぇ」から「フェーズ」へ。小さい「っ」以外を直前の仮名と結合します。'
+        };
+        const tsuHelp = {
+          large: '例：「まっちゃ」→「まつちゃ」。小さい「っ」を大きい「つ」に置き換えます。',
+          keep: '小さい「っ」を変換せず、そのまま独立した1文字として扱います。',
+          combine: '例：「まっちゃ」の「まっ」を一まとまりとして扱います。',
+          remove: '例：「まっちゃ」→「まちゃ」。伸ばし棒を「っ」に変換した後も含め、すべての「っ」を消去します。'
+        };
+        const kanaOnlyHelp = 'この設定は「ひらがな」モードでのみ使用します。';
+        $('longRuleHelp').textContent = kanaMode ? longHelp[rules.long] : kanaOnlyHelp;
+        $('dakutenRuleHelp').textContent = kanaMode ? dakutenHelp[rules.dakuten] : kanaOnlyHelp;
+        $('smallRuleHelp').textContent = kanaMode ? smallHelp[rules.small] : kanaOnlyHelp;
+        $('tsuRuleHelp').textContent = kanaMode ? tsuHelp[rules.tsu] : kanaOnlyHelp;
+        $('nRuleHelp').textContent = rules.characterSet === 'latin' || rules.characterSet === 'digits'
+          ? 'この文字集合では「ん」判定は適用されません。'
+          : rules.characterSet === 'custom'
+            ? 'ユーザー定義の文字集合に「ん」が含まれる場合、その文字で終わると負けます。'
+            : '正規化後の末尾が「ん」なら負けます。';
+        const gapHelp = $('gapRuleHelp');
+        gapHelp.hidden = !isGapRule(rules.ending);
+        if (isGapRule(rules.ending)) {
+          const orderName = rules.characterSet === 'hiragana' || (rules.characterSet === 'custom' && customSpec.valid && customSpec.kind === 'hiragana')
+            ? '五十音順'
+            : rules.characterSet === 'digits' || (rules.characterSet === 'custom' && customSpec.valid && customSpec.kind === 'digits')
+              ? '数の小さい順'
+              : rules.characterSet === 'custom' && customSpec.valid && customSpec.kind === 'katakana'
+                ? '五十音順'
+                : 'アルファベット順';
+          gapHelp.textContent = `文字の順序は${orderName}です。ひらがなモードでは、正規化後に濁点・半濁点付き文字、小さい文字、伸ばし棒が残る入力は使用できません。`;
+        }
+        describeConstraintFunctions();
+      }
+
+      function showEmptyHistory() {
+        const empty = document.createElement('span');
+        empty.className = 'empty-history';
+        empty.textContent = 'まだことばがありません。最初の一語をどうぞ。';
+        $('historyList').replaceChildren(empty);
+      }
+      function appendHistoryEntry(entry, index) {
+        const list = $('historyList');
+        if (index === 0) list.replaceChildren();
+        const item = document.createElement('div');
+        item.className = `history-item${entry.foul ? ' rule-violation' : ''}`;
+        item.dataset.player = String(entry.player);
+        item.dataset.foul = entry.foul ? 'true' : 'false';
+        item.dataset.reason = entry.foulReason || '';
+        if (entry.display !== entry.memo) item.title = `入力：${entry.display} ／ 判定用の記録：${entry.memo}`;
+        const number = document.createElement('span');
+        number.className = 'number';
+        number.textContent = `第${entry.turnIndex}ターン`;
+        const word = document.createElement('span');
+        word.className = 'word';
+        word.textContent = entry.memo;
+        const owner = document.createElement('span');
+        owner.className = 'owner';
+        owner.textContent = entry.foul ? `${nameOf(entry.player)} · 反則：${entry.foulReason}` : nameOf(entry.player);
+        item.append(number, word, owner);
+        list.append(item);
+      }
+      function removeLastHistoryEntry() {
+        const list = $('historyList');
+        if (list.lastElementChild) list.lastElementChild.remove();
+        if (!state.history.length) showEmptyHistory();
+      }
+      function updateHistoryOwnerNames() {
+        $('historyList').querySelectorAll('.history-item').forEach(item => {
+          const player = Number(item.dataset.player);
+          const owner = item.querySelector('.owner');
+          if (owner) owner.textContent = item.dataset.foul === 'true'
+            ? `${nameOf(player)} · 反則：${item.dataset.reason}`
+            : nameOf(player);
+        });
+      }
+
+      function isDemoMode() { return $('playerCountSetting').value === '0'; }
+      function isSoloMode() { return $('playerCountSetting').value === '1'; }
+
+      const MAX_DEMO_STEPS_PER_RUN = 1000;
+      const MAX_DEMO_WORD_UNITS = 1000000;
+
+      function getDemoAlphabet(rules) {
+        const customSpec = rules.characterSet === 'custom' ? classifyCustomAlphabet(rules.customAlphabet) : null;
+        const info = getGapOrderInfo(rules, customSpec);
+        if (!info.valid) throw new Error(info.message);
+        if (rules.characterSet === 'custom') {
+          const allowed = new Set(customSpec.chars);
+          return info.order.filter(ch => allowed.has(ch));
+        }
+        return info.order.slice();
+      }
+
+      function repeatDemoFirstChar(firstChar, length) {
+        const n = Number(length);
+        if (!Number.isSafeInteger(n) || n < 1) throw new Error('お手本の文字列長を整数として扱えません。');
+        if (n > MAX_DEMO_WORD_UNITS) throw new Error(`お手本の1語が安全上限の${MAX_DEMO_WORD_UNITS.toLocaleString()}文字を超えます。長さ制限を見直してください。`);
+        return firstChar.repeat(n);
+      }
+
+      function nextLexicographicWord(units, alphabet, rankMap) {
+        const indexes = units.map(ch => rankMap.get(ch));
+        if (indexes.some(index => index === undefined)) throw new Error('現在の文字列に文字集合外の文字が含まれています。');
+        for (let pos = indexes.length - 1; pos >= 0; pos--) {
+          if (indexes[pos] + 1 < alphabet.length) {
+            indexes[pos]++;
+            for (let j = pos + 1; j < indexes.length; j++) indexes[j] = 0;
+            return indexes.map(index => alphabet[index]);
+          }
+        }
+        return null;
+      }
+
+      function getDemoConnectionConstant(rules) {
+        const expression = rules.joinLengthFunction;
+        if (!isConstantExpression(expression)) {
+          throw new Error('お手本モードでは、接続文字数 f(i) は定数にしてください（例：0、1、2）。');
+        }
+        return evaluateRuleFunction(expression, 2, '接続文字数', 0n);
+      }
+
+      function demoEndingLabel(ending) {
+        if (ending === 'same') return '同一文字列禁止';
+        if (ending === 'prefix') return '前置部分文字列禁止';
+        if (ending === 'suffix') return '後置部分文字列禁止';
+        if (ending === 'substring') return '部分文字列禁止';
+        return '未対応の終了条件';
+      }
+
+      function demoCandidateConflict(candidate, rules) {
+        const memo = normalizeWord(candidate, rules);
+        const data = prepareComparisonData(memo, rules);
+        return findConflictingEntry(data, memo, rules);
+      }
+
+      function demoSafeNonnegativeLength(value, label = 'お手本の文字列長') {
+        const n = Number(value);
+        if (!Number.isSafeInteger(n) || n < 0) throw new Error(`${label}を0以上の整数として扱えません。`);
+        if (n > MAX_DEMO_WORD_UNITS) throw new Error(`お手本の1語が安全上限の${MAX_DEMO_WORD_UNITS.toLocaleString()}文字を超えます。長さ制限を見直してください。`);
+        return n;
+      }
+      function demoSafeIntegerLength(value, label = 'お手本の文字列長') {
+        const n = demoSafeNonnegativeLength(value, label);
+        if (n < 1) throw new Error(`${label}を正の整数として扱えません。`);
+        return n;
+      }
+
+      function createSameDemoCandidate(rules, alphabet, c, previous) {
+        const first = alphabet[0];
+        const turnIndex = state.words.length + 1;
+        const bounds = readLengthBounds(rules, turnIndex);
+        const minimum = maxBigInt(1n, bounds.min === null ? 1n : bounds.min);
+        const maximum = bounds.max;
+
+        if (!previous) {
+          let initialLength = minimum;
+          if (maximum !== null && initialLength > maximum) initialLength = maximum >= 1n ? maximum : 1n;
+          return repeatDemoFirstChar(first, initialLength);
+        }
+
+        const units = previous.units;
+        const currentLength = BigInt(units.length);
+        const twiceConnection = 2n * c;
+
+        if (currentLength <= twiceConnection) {
+          let targetLength = maxBigInt(currentLength + 1n, minimum);
+          if (maximum !== null && targetLength > maximum) return previous.memo;
+          return repeatDemoFirstChar(first, targetLength);
+        }
+
+        const cNumber = Number(c);
+        if (!Number.isSafeInteger(cNumber) || cNumber < 0 || cNumber * 2 > units.length) {
+          throw new Error('接続文字数が現在の文字列長に対して大きすぎます。');
+        }
+        const middle = units.slice(cNumber, units.length - cNumber);
+        const rankMap = new Map(alphabet.map((ch, index) => [ch, index]));
+        const successor = nextLexicographicWord(middle, alphabet, rankMap);
+
+        if (successor !== null) {
+          if (minimum > currentLength) return repeatDemoFirstChar(first, minimum);
+          if (maximum !== null && currentLength > maximum) return previous.memo;
+          return units.slice(0, cNumber).concat(successor, units.slice(units.length - cNumber)).join('');
+        }
+
+        const nextLength = maxBigInt(currentLength + 1n, minimum);
+        if (maximum !== null && nextLength > maximum) {
+          const fallbackLength = maximum >= 1n ? maximum : 1n;
+          return repeatDemoFirstChar(first, fallbackLength);
+        }
+        return repeatDemoFirstChar(first, nextLength);
+      }
+
+      function createPrefixSuffixInitial(rules, alphabet, c, bounds) {
+        const first = alphabet[0];
+        if (bounds.impossible) {
+          const fallback = bounds.max !== null && bounds.max >= 1n ? bounds.max : 1n;
+          return repeatDemoFirstChar(first, fallback);
+        }
+
+        const twoC = 2n * c;
+        if (bounds.max !== null && bounds.max <= twoC) {
+          // 短い上限では、初手から上限長いっぱいの同一文字列を置く。
+          return repeatDemoFirstChar(first, bounds.max >= 1n ? bounds.max : 1n);
+        }
+
+        // 長い上限では、初手から左右の固定ブロックと、最小文字以外の辞書順最小の中央部を置く。
+        // c=0 の場合も両端に最小文字を1つずつ置くため、中央部を1文字以上確保する。
+        const anchorLength = c === 0n ? 1n : c;
+        const baseLength = 2n * anchorLength + 1n;
+        let initialLength = maxBigInt(baseLength, bounds.min === null ? 1n : bounds.min);
+        if (bounds.max !== null && initialLength > bounds.max) initialLength = bounds.max >= 1n ? bounds.max : 1n;
+        const length = demoSafeNonnegativeLength(initialLength);
+        const anchorSize = Number(anchorLength);
+        const block = first.repeat(anchorSize);
+        if (length < 2 * anchorSize) return repeatDemoFirstChar(first, length);
+        const middleLength = length - 2 * anchorSize;
+        const middleAlphabet = alphabet.filter(ch => ch !== first);
+        if (middleLength === 0) return block + block;
+        if (!middleAlphabet.length) return repeatDemoFirstChar(first, length);
+        return block + middleAlphabet[0].repeat(middleLength) + block;
+      }
+
+      function createShortPrefixSuffixCandidate(rules, alphabet, c, previous, bounds) {
+        const first = alphabet[0];
+        if (bounds.impossible) {
+          const fallback = bounds.max !== null && bounds.max >= 1n ? bounds.max : 1n;
+          return repeatDemoFirstChar(first, fallback);
+        }
+        if (bounds.max !== null && bounds.max < 1n) return repeatDemoFirstChar(first, 1);
+        const length = demoSafeIntegerLength(bounds.max, '短い上限長');
+        const requiredCount = Number(c < BigInt(previous.units.length) ? c : BigInt(previous.units.length));
+        const prefix = requiredCount > 0 ? previous.units.slice(-requiredCount) : [];
+        if (prefix.length > length) return repeatDemoFirstChar(first, length);
+
+        const left = prefix[0] || first;
+        const leftRank = alphabet.indexOf(left);
+        const right = leftRank >= 0 ? alphabet[leftRank + 1] : undefined;
+        if (!right || prefix.length === 0) return repeatDemoFirstChar(left, length);
+
+        // 接続部分に既に右側の文字が現れていれば、切替位置は前の文字列だけで確定する。
+        // そうでなければ、左側の文字数が多い候補から順に調べる。
+        let fixedLeftCount = -1;
+        let seenRight = false;
+        let patternValid = true;
+        for (let i = 0; i < prefix.length; i++) {
+          if (prefix[i] === left && !seenRight) continue;
+          if (prefix[i] === right) {
+            if (!seenRight) fixedLeftCount = i;
+            seenRight = true;
+            continue;
+          }
+          patternValid = false;
+          break;
+        }
+        if (seenRight && fixedLeftCount < 0) patternValid = false;
+
+        const candidates = [];
+        if (!patternValid) {
+          // 既存の接続部分自体が「左文字→直後の文字」の形でない場合は、同一文字に退避する。
+          return repeatDemoFirstChar(left, length);
+        }
+        if (seenRight) {
+          candidates.push(left.repeat(fixedLeftCount) + right.repeat(length - fixedLeftCount));
+        } else {
+          for (let leftCount = length - 1; leftCount >= prefix.length; leftCount--) {
+            candidates.push(left.repeat(leftCount) + right.repeat(length - leftCount));
+          }
+        }
+
+        for (const candidate of candidates) {
+          if (candidate.length !== length) continue;
+          if (!prefix.every((unit, index) => candidate[index] === unit)) continue;
+          if (!demoCandidateConflict(candidate, rules)) return candidate;
+        }
+        // すべての二文字連続パターンが禁止条件に抵触した場合は、左文字だけに戻す。
+        return repeatDemoFirstChar(left, length);
+      }
+
+      function lexicographicFirstWord(alphabet, length) {
+        if (length === 0) return [];
+        if (!alphabet.length) return null;
+        return Array(length).fill(alphabet[0]);
+      }
+
+      function createLongPrefixSuffixCandidate(rules, alphabet, c, previous, bounds) {
+        if (bounds.impossible) return previous.memo;
+        const first = alphabet[0];
+        const cNumber = Number(c);
+        if (!Number.isSafeInteger(cNumber) || cNumber < 0 || cNumber > MAX_DEMO_WORD_UNITS) {
+          throw new Error('接続文字数が安全な範囲を超えています。');
+        }
+        const anchorSize = cNumber === 0 ? 1 : cNumber;
+        const baseLength = 2 * anchorSize + 1;
+        const previousLength = previous.units.length;
+        let targetLength = Math.max(previousLength, baseLength, bounds.min === null ? 1 : demoSafeNonnegativeLength(bounds.min, '文字列長の下限'));
+        const maximum = bounds.max === null ? null : demoSafeNonnegativeLength(bounds.max, '文字列長の上限');
+
+        let block;
+        if (cNumber === 0) {
+          block = [first];
+        } else if (previous.units.length >= cNumber) {
+          block = previous.units.slice(previous.units.length - cNumber);
+        } else {
+          block = Array(cNumber).fill(first);
+        }
+        const forbiddenMiddleChar = block[0];
+        // 部分文字列禁止では、短い既出語（長さ<=2c）に現れた文字を中央部からすべて除外する。
+        const shortWordChars = new Set();
+        if (rules.ending === 'substring') {
+          const shortWordLimit = 2n * c;
+          for (const entry of state.words) {
+            if (BigInt(entry.units.length) <= shortWordLimit) {
+              for (const unit of entry.units) shortWordChars.add(unit);
+            }
+          }
+        }
+        const middleAlphabet = alphabet.filter(ch => ch !== forbiddenMiddleChar && !shortWordChars.has(ch));
+        const zeroConnectionFallback = () => {
+          if (maximum !== null && maximum >= 2 && middleAlphabet.length) {
+            const fallbackLength = demoSafeNonnegativeLength(BigInt(maximum));
+            return first + middleAlphabet[0].repeat(Math.max(0, fallbackLength - 2)) + first;
+          }
+          if (maximum !== null && maximum >= 1) return repeatDemoFirstChar(first, maximum);
+          return previous.memo;
+        };
+
+        if (maximum !== null && targetLength > maximum) {
+          return cNumber === 0 ? zeroConnectionFallback() : previous.memo;
+        }
+        if (!middleAlphabet.length) {
+          return cNumber === 0
+            ? (maximum !== null && maximum >= 1 ? repeatDemoFirstChar(first, maximum) : previous.memo)
+            : previous.memo;
+        }
+
+        const rankMap = new Map(middleAlphabet.map((ch, index) => [ch, index]));
+        const blockText = block.join('');
+        const searchBudget = 100000;
+        let searched = 0;
+        let restartAtLength = targetLength > previousLength;
+
+        while (true) {
+          if (maximum !== null && targetLength > maximum) {
+            return cNumber === 0 ? zeroConnectionFallback() : previous.memo;
+          }
+          if (targetLength > MAX_DEMO_WORD_UNITS) {
+            throw new Error(`お手本の1語が安全上限の${MAX_DEMO_WORD_UNITS.toLocaleString()}文字を超えます。長さ制限を見直してください。`);
+          }
+          const middleLength = targetLength - 2 * anchorSize;
+          if (middleLength < 0) throw new Error('左右の固定部分だけで文字列長の上限を超えています。');
+          const middleLengthNumber = demoSafeNonnegativeLength(BigInt(middleLength), '中央部分の長さ');
+          const previousMiddle = previous.units.slice(anchorSize, previous.units.length - anchorSize);
+          const hasLongPatternShape = previous.units.length >= 2 * anchorSize
+            && previous.units.slice(0, anchorSize).every((ch, index) => ch === block[index])
+            && previous.units.slice(previous.units.length - anchorSize).every((ch, index) => ch === block[index]);
+          let middle;
+          if (restartAtLength || !hasLongPatternShape || previousMiddle.length !== middleLengthNumber || previousMiddle.some(ch => !rankMap.has(ch))) {
+            middle = lexicographicFirstWord(middleAlphabet, middleLengthNumber);
+          } else if (middleLengthNumber === 0) {
+            middle = [];
+          } else {
+            middle = nextLexicographicWord(previousMiddle, middleAlphabet, rankMap);
+          }
+
+          while (middle !== null) {
+            if (++searched > searchBudget) {
+              throw new Error('同じ長さの候補探索が上限に達しました。続きを生成できるかは未確認です。');
+            }
+            const candidate = blockText + middle.join('') + blockText;
+            if (!demoCandidateConflict(candidate, rules)) return candidate;
+            middle = nextLexicographicWord(middle, middleAlphabet, rankMap);
+          }
+
+          const nextLength = Math.max(targetLength + 1, bounds.min === null ? 1 : demoSafeNonnegativeLength(bounds.min, '文字列長の下限'));
+          if (maximum !== null && nextLength > maximum) {
+            return cNumber === 0 ? zeroConnectionFallback() : previous.memo;
+          }
+          targetLength = nextLength;
+          restartAtLength = true;
+        }
+      }
+
+      // 同一文字列・前置部分文字列・後置部分文字列・部分文字列禁止のお手本列を1手だけ生成する。
+      // 生成候補は必ず通常のsubmitWord()を通し、長さ・接続・文字集合などの共通判定を受ける。
+      function createDemoCandidate(rules, alphabet, c) {
+        if (!alphabet.length) throw new Error('使用できる文字集合が空です。');
+        const previous = state.words.length ? state.words[state.words.length - 1] : null;
+        if (rules.ending === 'same') return createSameDemoCandidate(rules, alphabet, c, previous);
+        if (rules.ending !== 'prefix' && rules.ending !== 'suffix' && rules.ending !== 'substring') {
+          throw new Error('お手本モードは同一文字列・前置部分文字列・後置部分文字列・部分文字列禁止に対応しています。');
+        }
+
+        const turnIndex = state.words.length + 1;
+        const bounds = readLengthBounds(rules, turnIndex);
+        if (!previous) return createPrefixSuffixInitial(rules, alphabet, c, bounds);
+        const shortThreshold = 2n * c;
+        if (bounds.max !== null && bounds.max <= shortThreshold) {
+          return createShortPrefixSuffixCandidate(rules, alphabet, c, previous, bounds);
+        }
+        return createLongPrefixSuffixCandidate(rules, alphabet, c, previous, bounds);
+      }
+
+      function runDemoSteps(requestedSteps) {
+        if (!isDemoMode() || !state.started || state.finished) return;
+        const steps = Math.max(1, Math.min(MAX_DEMO_STEPS_PER_RUN, Math.floor(Number(requestedSteps) || 1)));
+        const rules = currentRules();
+        let alphabet;
+        let c;
+        try {
+          alphabet = getDemoAlphabet(rules);
+          c = getDemoConnectionConstant(rules);
+        } catch (error) {
+          feedback(error.message);
+          return;
+        }
+
+        let completed = 0;
+        let stoppedByError = false;
+        state.demoBatchRunning = true;
+        try {
+          for (let step = 0; step < steps && !state.finished; step++) {
+            let candidate;
+            try {
+              candidate = createDemoCandidate(rules, alphabet, c);
+            } catch (error) {
+              feedback(`お手本生成を停止しました：${error.message}`);
+              stoppedByError = true;
+              break;
+            }
+            const previousHistoryLength = state.history.length;
+            $('wordInput').value = candidate;
+            submitWord();
+            if (state.history.length === previousHistoryLength) {
+              // 共通判定が関数式などの理由で処理を拒否した場合は、反則とせず停止する。
+              stoppedByError = true;
+              break;
+            }
+            completed++;
+          }
+        } finally {
+          state.demoBatchRunning = false;
+        }
+
+        render();
+        if (state.finished) {
+          feedback(`お手本プレイ終了。${state.words.length}ターン目まで続きました（${state.words.length + 1}手目で終了）。`, 'success');
+          $('demoStatus').textContent = `終了：${state.words.length}ターンの有効な列を生成しました。`;
+        } else if (stoppedByError) {
+          $('demoStatus').textContent = `生成を停止しました。現在${state.words.length}ターンまで記録しています。`;
+        } else {
+          $('demoStatus').textContent = `${completed}手進めました。現在${state.words.length}ターンまで記録しています。次の1手、または続きの手数を指定できます。`;
+          feedback(`${completed}手進めました（有効な列は${state.words.length}ターン）。`, 'success');
+        }
+      }
+      function activePlayerIndexes() {
+        return state.activePlayers.map((active, index) => active ? index : -1).filter(index => index >= 0);
+      }
+      function nextActivePlayer(afterIndex) {
+        const count = state.activePlayers.length;
+        for (let step = 1; step <= count; step++) {
+          const candidate = (afterIndex + step) % count;
+          if (state.activePlayers[candidate]) return candidate;
+        }
+        return -1;
+      }
+      function renderPlayerCards() {
+        const grid = $('playersGrid');
+        grid.replaceChildren();
+        state.playerNames.forEach((name, index) => {
+          const card = document.createElement('div');
+          card.className = 'player';
+          card.id = `playerCard${index}`;
+          const top = document.createElement('div');
+          top.className = 'player-top';
+          const label = document.createElement('span');
+          label.className = 'player-label';
+          label.textContent = isDemoMode() ? 'CPU · MODEL PLAY' : `PLAYER ${String(index + 1).padStart(2, '0')}`;
+          const chip = document.createElement('span');
+          chip.className = 'turn-chip';
+          chip.textContent = isDemoMode() ? '自動生成' : 'あなたの番';
+          top.append(label, chip);
+          const input = document.createElement('input');
+          input.className = 'player-name';
+          input.id = `playerName${index}`;
+          input.type = 'text';
+          input.maxLength = 16;
+          input.value = name;
+          input.setAttribute('aria-label', `プレイヤー${index + 1}の名前`);
+          input.addEventListener('input', () => {
+            state.playerNames[index] = input.value;
+            updateHistoryOwnerNames();
+            render();
+          });
+          const count = document.createElement('div');
+          count.className = 'player-count';
+          count.id = `playerCount${index}`;
+          card.append(top, input, count);
+          grid.append(card);
+        });
+      }
+      function configurePlayerCount(count) {
+        const requested = Number(count);
+        const demo = requested === 0;
+        const newCount = demo ? 1 : Math.max(1, Math.min(10, Number(count) || 2));
+        const oldNames = state.playerNames.slice();
+        state.playerNames = demo
+          ? ['お手本CPU']
+          : Array.from({ length: newCount }, (_, i) => {
+              const old = oldNames[i];
+              return old && old !== 'お手本CPU' ? old : `プレイヤー${i + 1}`;
+            });
+        state.playerCounts = Array(newCount).fill(0);
+        state.activePlayers = Array(newCount).fill(true);
+        state.eliminationOrder = [];
+        state.turn = 0;
+        renderPlayerCards();
+        render();
+      }
+      function releaseEntryCache(entry) {
+        if (entry && entry.gapMaskData) {
+          state.gapMaskBytes = Math.max(0, state.gapMaskBytes - entry.gapMaskData.byteLength);
+          entry.gapMaskData = null;
+        }
+      }
+      function finishIfOneRemains(lastLoser) {
+        const survivors = activePlayerIndexes();
+        if (isSoloMode() || isDemoMode()) {
+          state.finished = true;
+          state.winner = null;
+          state.loser = lastLoser;
+          state.endReason = isDemoMode() ? 'demo-foul' : 'solo-foul';
+          return true;
+        }
+        if (survivors.length > 1) return false;
+        state.finished = true;
+        state.winner = survivors.length === 1 ? survivors[0] : null;
+        state.loser = lastLoser;
+        state.endReason = 'elimination';
+        return true;
+      }
+      function registerFoul(entry, automatic = false) {
+        entry.foul = true;
+        entry.ruleViolation = true;
+        entry.automatic = automatic;
+        state.history.push(entry);
+        appendHistoryEntry(entry, state.history.length - 1);
+        releaseEntryCache(entry);
+        if (!automatic) state.playerCounts[entry.player]++;
+        state.activePlayers[entry.player] = false;
+        state.eliminationOrder.push(entry.player);
+        state.loser = entry.player;
+        if (!finishIfOneRemains(entry.player)) state.turn = nextActivePlayer(entry.player);
+      }
+      function currentMoveAvailability(rules) {
+        const turnIndex = state.words.length + 1;
+        const overlap = turnIndex > 1
+          ? evaluateRuleFunction(rules.joinLengthFunction, turnIndex, '接続文字数', 0n)
+          : 0n;
+        const previous = state.words.length ? state.words[state.words.length - 1] : null;
+        return readNextTurnAvailability(rules, turnIndex, previous ? previous.units : [], overlap);
+      }
+      function eliminateBlockedPlayers(rules) {
+        // 1人モードでは自動脱落させず、本人が実際に入力して違反した時点で終了する。
+        if (isSoloMode() || isDemoMode()) return;
+        // 複数人モードでは長さ・接続条件上、誰にも合法手がない場合に自動脱落させる。
+        while (!state.finished) {
+          let availability;
+          try {
+            availability = currentMoveAvailability(rules);
+          } catch (error) {
+            feedback(`長さ・接続の関数式を確認してください：${error.message}`);
+            return;
+          }
+          if (availability.possible) return;
+          const player = state.turn;
+          const entry = {
+            display: '（有効な手なし）',
+            memo: '（有効な手なし）',
+            player,
+            turnIndex: state.words.length + 1,
+            foulReason: availability.reason,
+            conflictWith: null
+          };
+          registerFoul(entry, true);
+        }
+      }
+      function getRanking() {
+        const ranking = [];
+        if (state.winner !== null) ranking.push(state.winner);
+        for (const player of [...state.eliminationOrder].reverse()) {
+          if (!ranking.includes(player)) ranking.push(player);
+        }
+        return ranking;
+      }
+      function render() {
+        const settingsLocked = state.started;
+        const characterSet = $('characterSet').value;
+        settingIds.forEach(id => {
+          const kanaOnly = kanaOnlySettingIds.includes(id);
+          const customOnly = id === 'customAlphabet';
+          $(id).disabled = settingsLocked || (kanaOnly && characterSet !== 'hiragana') || (customOnly && characterSet !== 'custom');
+        });
+        $('nRule').disabled = settingsLocked || characterSet === 'latin' || characterSet === 'digits';
+        $('reciprocalRule').disabled = settingsLocked || !reciprocalApplicable.has($('endingRule').value);
+        $('playerCountSetting').disabled = settingsLocked;
+        $('settingsLock').textContent = settingsLocked
+          ? '対局中のため判定設定と参加人数は変更できません。変更する場合は「最初からやり直す」を押してください。'
+          : 'ゲーム開始前は判定設定と参加人数を変更できます。';
+        $('startPanel').hidden = settingsLocked;
+        const startNote = $('startPanel').querySelector('.start-note');
+        if (startNote) startNote.textContent = isDemoMode()
+          ? `${demoEndingLabel(currentRules().ending)}のお手本アルゴリズムを選択しました。設定確認後、ゲームを開始してください。`
+          : 'プレイヤー名とルールを設定したら、ゲームを開始してください。';
+        $('rosterNote').textContent = isDemoMode()
+          ? `お手本モード：${demoEndingLabel(currentRules().ending)}の規則に従ってCPUが悪列を生成します。`
+          : isSoloMode()
+            ? '1人プレイ：自分がルール違反をするまで悪列を伸ばします。'
+            : `${activePlayerIndexes().length}人参加中 · 反則した人は脱落し、残りの人で続行します。`;
+        $('demoControls').hidden = !isDemoMode() || !state.started || state.finished;
+        $('wordForm').hidden = isDemoMode();
+        $('inputNote').hidden = isDemoMode();
+        $('demoNextButton').disabled = !state.started || state.finished;
+        $('demoBatchButton').disabled = !state.started || state.finished;
+        $('demoStepCount').disabled = !state.started || state.finished;
+        describeRules();
+        for (let i = 0; i < state.playerNames.length; i++) {
+          const card = $('playerCard' + i);
+          card.classList.toggle('active', state.started && !state.finished && state.turn === i && state.activePlayers[i]);
+          card.classList.toggle('eliminated', !state.activePlayers[i]);
+          card.classList.toggle('winner', state.finished && state.winner === i);
+          $('playerName' + i).disabled = settingsLocked || isDemoMode();
+          $('playerCount' + i).textContent = isDemoMode()
+            ? `${state.words.length}手生成`
+            : isSoloMode()
+              ? (state.finished ? `敗北 · ${state.words.length}ターン成功` : `${state.words.length}ターン成功`)
+              : state.activePlayers[i]
+                ? `${state.playerCounts[i]} 回参加`
+                : `脱落 · ${state.playerCounts[i]} 回参加`;
+        }
+
+        const currentName = nameOf(state.turn);
+        if (!state.started) {
+          $('turnCaption').textContent = 'READY TO PLAY';
+          $('turnTitle').textContent = '設定を確認してゲームを開始してください';
+          $('turnDescription').textContent = isDemoMode()
+            ? `${demoEndingLabel(currentRules().ending)}のお手本アルゴリズムを実行し、悪列の生成過程を確認できます。`
+            : isSoloMode()
+              ? '1人で悪列を作り、ルール違反をした時点でチャレンジ終了です。'
+              : '参加人数・プレイヤー名・判定条件を設定して開始します。';
+          $('requiredLabel').textContent = '開始前';
+          $('requiredLetter').textContent = '準備完了？';
+          $('requiredLetter').className = 'required-letter first';
+          $('endPanel').classList.remove('show');
+        } else if (state.finished) {
+          if (state.endReason === 'demo-foul') {
+            const validTurns = state.words.length;
+            const finalEvent = state.history[state.history.length - 1];
+            $('turnCaption').textContent = 'MODEL PLAY FINISHED';
+            $('turnTitle').textContent = 'お手本プレイ終了';
+            $('turnDescription').textContent = `${demoEndingLabel(currentRules().ending)}に該当する手を出したため、生成を終了しました。`;
+            $('requiredLabel').textContent = 'FINAL';
+            $('requiredLetter').textContent = 'END';
+            $('requiredLetter').className = 'required-letter';
+            $('endPanel').classList.add('show');
+            $('endTitle').textContent = 'お手本の生成が終了しました';
+            const reason = finalEvent && finalEvent.foulReason ? `\n終了理由：${finalEvent.foulReason}` : '';
+            $('endDetail').textContent = `${validTurns}ターンの悪列を生成しました（次の${validTurns + 1}手目で終了）。${reason}`;
+          } else if (state.endReason === 'solo-foul') {
+            const validTurns = state.words.length;
+            const finalEvent = state.history[state.history.length - 1];
+            $('turnCaption').textContent = 'CHALLENGE FINISHED';
+            $('turnTitle').textContent = 'チャレンジ終了！';
+            $('turnDescription').textContent = `${nameOf(state.loser)}がルール違反をしました。`;
+            $('requiredLabel').textContent = 'FINAL';
+            $('requiredLetter').textContent = 'END';
+            $('requiredLetter').className = 'required-letter';
+            $('endPanel').classList.add('show');
+            $('endTitle').textContent = `${nameOf(state.loser)}の挑戦終了`;
+            const reason = finalEvent && finalEvent.foulReason ? `\n反則理由：${finalEvent.foulReason}` : '';
+            $('endDetail').textContent = `${validTurns}ターン目まで続いた！（${validTurns + 1}ターン目で敗北）${reason}`;
+          } else {
+            $('turnCaption').textContent = 'GAME FINISHED';
+            $('turnTitle').textContent = state.winner === null ? 'ゲーム終了' : `${nameOf(state.winner)} の勝ち！`;
+            $('turnDescription').textContent = '脱落したプレイヤーを除いて、対局が終了しました。';
+            $('requiredLabel').textContent = 'WINNER';
+            $('requiredLetter').textContent = '★';
+            $('requiredLetter').className = 'required-letter';
+            $('endPanel').classList.add('show');
+            $('endTitle').textContent = state.winner === null ? '勝者なし' : `${nameOf(state.winner)} が最後まで残りました！`;
+            const lastLoser = state.loser;
+            const validTurns = state.words.length;
+            const ranking = getRanking().map((player, index) => `${index + 1}位　${nameOf(player)}`).join('\n');
+            const ending = lastLoser === null ? '' : `${validTurns}ターン目まで続いた！（${validTurns + 1}ターン目で${nameOf(lastLoser)}が脱落）`;
+            const finalEvent = state.history[state.history.length - 1];
+            const reason = finalEvent && finalEvent.foulReason ? `\n最後の反則：${finalEvent.foulReason}` : '';
+            $('endDetail').textContent = `${ending}${reason}\n\n最終順位\n${ranking}`;
+          }
+        } else {
+          $('turnCaption').textContent = isDemoMode()
+            ? `第${state.words.length + 1}ターン目 · MODEL PLAY`
+            : isSoloMode() ? `第${state.words.length + 1}ターン目 · SOLO CHALLENGE` : `第${state.words.length + 1}ターン目 · ${currentName} の番`;
+          $('turnTitle').textContent = isDemoMode()
+            ? 'CPUのお手本プレイ'
+            : isSoloMode() ? '悪列を続けましょう' : `${currentName} の番です`;
+          if (isDemoMode()) $('turnDescription').textContent = '「次の1手を見る」または手数を指定して、お手本の続きを再生してください。';
+          const nextEntry = state.words.length ? state.words[state.words.length - 1] : null;
+          const next = nextEntry ? nextEntry.next : null;
+          const requiredCount = nextEntry ? nextEntry.nextJoinCount : 0;
+          $('turnDescription').textContent = nextEntry
+            ? (requiredCount === 0 ? '直前の有効な文字列との接続制限はありません。' : `直前の有効な文字列の末尾${requiredCount}文字と、先頭${requiredCount}文字を一致させてください。`)
+            : '好きな文字列から始めましょう。';
+          $('requiredLabel').textContent = !nextEntry ? '最初の一文字' : requiredCount === 0 ? '接続制限なし' : `この${requiredCount}文字からスタート`;
+          $('requiredLetter').textContent = nextEntry && next !== null && next !== '' ? next : 'なんでもOK';
+          $('requiredLetter').className = nextEntry && requiredCount > 0 ? 'required-letter' : 'required-letter first';
+          $('endPanel').classList.remove('show');
+        }
+        $('wordInput').disabled = !state.started || state.finished || isDemoMode();
+        $('submitButton').disabled = !state.started || state.finished || isDemoMode();
+        const previous = state.words.length ? state.words[state.words.length - 1] : null;
+        if (characterSet === 'hiragana') {
+          $('wordInput').placeholder = previous ? (previous.nextJoinCount ? `「${previous.next}」から始まることば` : '接続制限なしで入力') : 'ことばを入力（例：りんご）';
+        } else if (characterSet === 'latin') {
+          $('wordInput').placeholder = previous ? (previous.nextJoinCount ? `「${previous.next}」から始まる単語` : '接続制限なしで入力') : '単語を入力（例：APPLE）';
+        } else if (characterSet === 'digits') {
+          $('wordInput').placeholder = previous ? (previous.nextJoinCount ? `「${previous.next}」から始まる数字列` : '接続制限なしで入力') : '数字列を入力（例：0123）';
+        } else {
+          $('wordInput').placeholder = previous ? (previous.nextJoinCount ? `「${previous.next}」から始まる文字列` : '接続制限なしで入力') : '文字列を入力';
+        }
+        $('undoButton').disabled = state.history.length === 0;
+        const foulCount = state.history.filter(entry => entry.foul).length;
+        $('historyCount').textContent = `${state.words.length} 有効ターン · ${foulCount} 反則`;
+      }
+
+      function validateGameSettings() {
+        const rules = currentRules();
+        if (isDemoMode()) {
+          if (!['same', 'prefix', 'suffix', 'substring'].includes(rules.ending)) {
+            feedback('現在のお手本モードは「1. 同一文字列禁止」「2. 前置部分文字列禁止」「3. 後置部分文字列禁止」「4. 部分文字列禁止」に対応しています。');
+            return false;
+          }
+          try {
+            if (!isConstantExpression(rules.joinLengthFunction)) {
+              feedback('現在のお手本モードでは、接続文字数 f(i) は定数にしてください（例：0、1、2）。');
+              return false;
+            }
+            getDemoAlphabet(rules);
+            getDemoConnectionConstant(rules);
+          } catch (error) {
+            feedback(`お手本モードの設定を確認してください：${error.message}`);
+            return false;
+          }
+        }
+        if (rules.characterSet === 'custom') {
+          const spec = classifyCustomAlphabet(rules.customAlphabet);
+          if (!spec.valid) { feedback(spec.message); return false; }
+        }
+        if (isGapRule(rules.ending)) {
+          const gapInfo = getGapOrderInfo(rules, rules.characterSet === 'custom' ? classifyCustomAlphabet(rules.customAlphabet) : null);
+          if (!gapInfo.valid) { feedback(gapInfo.message); return false; }
+        }
+        try {
+          readLengthBounds(rules, 1);
+          readLengthBounds(rules, 2);
+          evaluateRuleFunction(rules.joinLengthFunction, 2, '接続文字数', 0n);
+        } catch (error) {
+          feedback(`関数式を確認してください：${error.message}`);
+          return false;
+        }
+        return true;
+      }
+      function startGameNow() {
+        state.started = true;
+        state.turn = 0;
+        $('nonWqoWarning').hidden = true;
+        feedback(isDemoMode() ? 'お手本モードを開始しました。続きを再生してください。' : 'ゲーム開始！', 'success');
+        render();
+        if (isDemoMode()) $('demoNextButton').focus();
+        else $('wordInput').focus();
+      }
+      function requestStartGame() {
+        if (state.started) return;
+        if (!validateGameSettings()) return;
+        const rules = currentRules();
+        if (nonWqoEndings.has(rules.ending)) {
+          $('nonWqoWarning').hidden = false;
+          $('confirmWarningButton').focus();
+          return;
+        }
+        startGameNow();
+      }
+
+      function feedback(message, type = '') {
+        const el = $('feedback');
+        el.textContent = message;
+        el.className = `feedback${type ? ' ' + type : ''}`;
+      }
+
+      function submitWord() {
+        if (state.finished || !state.activePlayers[state.turn]) return;
+        const rules = currentRules();
+        const player = state.turn;
+        const turnIndex = state.words.length + 1; // 反則手は数えない。
+        const raw = $('wordInput').value;
+        if (!raw.trim()) return feedback('文字列を入力してください。');
+        let display = raw;
+        let source = raw;
+        let memo = raw;
+        let comparisonData = null;
+        const customSpec = rules.characterSet === 'custom' ? classifyCustomAlphabet(rules.customAlphabet) : null;
+        if (customSpec && !customSpec.valid) return feedback(customSpec.message);
+
+        const commitFoul = (reason, attemptedMemo = memo, data = comparisonData, conflict = null) => {
+          const entry = {
+            display,
+            memo: attemptedMemo || display || '（入力内容なし）',
+            ...(data || { units: Array.from(attemptedMemo || display || '') }),
+            player,
+            turnIndex,
+            foulReason: reason,
+            conflictWith: conflict ? conflict.memo : null
+          };
+          registerFoul(entry, false);
+          $('wordInput').value = '';
+          if (!state.finished && !isSoloMode() && !isDemoMode()) eliminateBlockedPlayers(rules);
+          if (state.demoBatchRunning) return;
+          if (state.endReason === 'demo-foul') {
+            feedback(`お手本は${state.words.length}ターンの悪列を生成して終了しました。`, 'success');
+          } else if (state.endReason === 'solo-foul') {
+            feedback(`${nameOf(player)}がルール違反をしました。${state.words.length}ターン目まで続きました。`, 'success');
+          } else if (state.finished) {
+            feedback(`${nameOf(player)}は反則で脱落しました。${state.winner === null ? 'ゲームが終了しました。' : `${nameOf(state.winner)}が最後まで残りました。`}`, 'success');
+          } else {
+            feedback(`${nameOf(player)}は反則で脱落しました。${nameOf(state.turn)}は直前の有効な文字列から続けます。`, 'success');
+          }
+          render();
+          if (!state.finished && !isDemoMode()) $('wordInput').focus();
+        };
+
+        if (rules.characterSet === 'hiragana') {
+          display = raw.trim().replace(/\s+/g, '');
+          source = toHiragana(display);
+          if (!/^[\u3041-\u3096ー]+$/.test(source)) {
+            return commitFoul('ひらがな・カタカナ以外の文字が入力されました。', display);
+          }
+          if (source.startsWith('ー')) {
+            return commitFoul('文字列の先頭に伸ばし棒「ー」は使えません。', source);
+          }
+        } else if (rules.characterSet === 'latin') {
+          if (!/^[A-Za-z]+$/.test(raw)) return commitFoul('ラテンアルファベット以外の文字が入力されました。', raw);
+        } else if (rules.characterSet === 'digits') {
+          if (!/^[0-9]+$/.test(raw)) return commitFoul('半角数字以外の文字が入力されました。', raw);
+        } else {
+          const allowedChars = customSpec.chars;
+          const allowed = new Set(allowedChars);
+          const invalidChar = Array.from(raw).find(ch => !allowed.has(ch));
+          if (invalidChar !== undefined) return commitFoul(`「${invalidChar}」は設定した文字集合に含まれていません。`, raw);
+          source = raw;
+          display = raw;
+        }
+
+        memo = normalizeWord(source, rules);
+        if (!memo) return commitFoul('判定ルールを適用した結果、記録できる文字がありません。', memo || display);
+        const gapInfo = isGapRule(rules.ending) ? getGapOrderInfo(rules, customSpec) : null;
+        if (gapInfo && !gapInfo.valid) return feedback(gapInfo.message);
+        if (gapInfo && rules.characterSet === 'hiragana') {
+          const unsupported = Array.from(memo).find(ch => !gapInfo.rankMap.has(ch));
+          if (unsupported !== undefined) {
+            return commitFoul(`gap部分列モードで使用できない文字「${unsupported}」が正規化後に残っています。`, memo);
+          }
+        }
+        comparisonData = prepareComparisonData(memo, rules, gapInfo);
+        const currentLength = BigInt(comparisonData.units.length);
+        let bounds;
+        let overlapNow;
+        const previousEntry = state.words.length ? state.words[state.words.length - 1] : null;
+        try {
+          bounds = readLengthBounds(rules, turnIndex);
+          if (bounds.impossible) return commitFoul(bounds.impossible, memo, comparisonData);
+          overlapNow = turnIndex > 1
+            ? evaluateRuleFunction(rules.joinLengthFunction, turnIndex, '接続文字数', 0n)
+            : 0n;
+          // お手本アルゴリズムの初期ランプでは、直前の語がc文字未満なら
+          // その語全体を接続部分として扱い、長さがcに達した後は通常どおりc文字を要求する。
+          if (isDemoMode() && previousEntry && overlapNow > BigInt(previousEntry.units.length)) {
+            overlapNow = BigInt(previousEntry.units.length);
+          }
+        } catch (error) {
+          return feedback(`長さ・接続の関数式を確認してください：${error.message}`);
+        }
+        if (bounds.min !== null && currentLength < bounds.min) {
+          return commitFoul(`第${turnIndex}ターン目は正規化後${bounds.min}文字以上が必要です（現在${comparisonData.units.length}文字）。`, memo, comparisonData);
+        }
+        if (bounds.max !== null && currentLength > bounds.max) {
+          return commitFoul(`第${turnIndex}ターン目は正規化後${bounds.max}文字以下が必要です（現在${comparisonData.units.length}文字）。`, memo, comparisonData);
+        }
+        if (currentLength < overlapNow) {
+          return commitFoul(`接続に${overlapNow}文字必要ですが、入力文字列は${comparisonData.units.length}文字です。`, memo, comparisonData);
+        }
+        if (previousEntry && !compareTailPrefix(previousEntry.units, comparisonData.units, overlapNow)) {
+          const reason = overlapNow > BigInt(previousEntry.units.length)
+            ? `前の有効な文字列は接続に必要な${overlapNow}文字より短いです。`
+            : `前の有効な文字列の末尾${overlapNow}文字と先頭${overlapNow}文字が一致しません。`;
+          return commitFoul(reason, memo, comparisonData);
+        }
+
+        let conflict;
+        try {
+          conflict = findConflictingEntry(comparisonData, memo, rules);
+        } catch (error) {
+          if (error && error.code === 'GAP_MASK_LIMIT') {
+            return commitFoul('gap比較用データが安全なメモリ上限を超えました。', memo, comparisonData);
+          }
+          throw error;
+        }
+        if (conflict) {
+          const ruleName = $('endingRule').selectedOptions[0].textContent.replace(/^\d+\. /, '');
+          const reciprocal = rules.reciprocal === 'mutual' && reciprocalApplicable.has(rules.ending) ? '（相互モード）' : '';
+          return commitFoul(`先に宣言された「${conflict.memo}」によって「${ruleName}」${reciprocal}に該当しました。`, memo, comparisonData, conflict);
+        }
+        const finalSound = comparisonData.units[comparisonData.units.length - 1] || '';
+        if (rules.n === 'forbid' && finalSound === 'ん') {
+          return commitFoul('正規化後の文字列が「ん」で終わっています。', memo, comparisonData);
+        }
+
+        let nextAvailability;
+        try {
+          let overlapNext = evaluateRuleFunction(rules.joinLengthFunction, turnIndex + 1, '接続文字数', 0n);
+          if (isDemoMode() && overlapNext > currentLength) overlapNext = currentLength;
+          nextAvailability = readNextTurnAvailability(rules, turnIndex + 1, comparisonData.units, overlapNext);
+        } catch (error) {
+          return feedback(`次ターンの関数式を確認してください：${error.message}`);
+        }
+        const entry = {
+          display,
+          memo,
+          ...comparisonData,
+          player,
+          turnIndex,
+          foul: false,
+          ruleViolation: false,
+          conflictWith: null,
+          next: nextAvailability.possible ? nextAvailability.requiredPrefix : null,
+          nextJoinCount: nextAvailability.possible ? nextAvailability.overlapNumber : 0
+        };
+        if (rules.ending === 'same') {
+          entry.indexed = true;
+          entry.indexKey = memo;
+          state.fastLookup.set(memo, entry);
+        } else if (rules.ending === 'last') {
+          entry.indexed = true;
+          entry.indexKey = finalSound;
+          state.fastLookup.set(finalSound, entry);
+        }
+        state.words.push(entry);
+        state.history.push(entry);
+        state.playerCounts[player]++;
+        appendHistoryEntry(entry, state.history.length - 1);
+        state.turn = nextActivePlayer(player);
+        $('wordInput').value = '';
+        if (!isDemoMode()) eliminateBlockedPlayers(rules);
+        if (!state.demoBatchRunning) {
+          if (state.finished) {
+            feedback(`「${memo}」を記録しました。次のターンに有効な手がなく、${nameOf(state.winner)}が最後まで残りました。`, 'success');
+          } else {
+            feedback(`「${memo}」！ 次は${entry.nextJoinCount ? `「${entry.next}」の${entry.nextJoinCount}文字` : '接続制限なし'}です。`, 'success');
+          }
+          render();
+          if (!state.finished && !isDemoMode()) $('wordInput').focus();
+        }
+      }
+
+      // ボタンのクリックとEnterキーの両方から同じ処理を呼び出す。
+      $('startGameButton').addEventListener('click', requestStartGame);
+      $('cancelWarningButton').addEventListener('click', () => { $('nonWqoWarning').hidden = true; $('startGameButton').focus(); });
+      $('confirmWarningButton').addEventListener('click', startGameNow);
+      $('nonWqoWarning').addEventListener('click', (event) => { if (event.target === $('nonWqoWarning')) $('cancelWarningButton').click(); });
+
+      $('demoNextButton').addEventListener('click', () => runDemoSteps(1));
+      $('demoBatchButton').addEventListener('click', () => {
+        const rawCount = Number($('demoStepCount').value);
+        if (!Number.isInteger(rawCount) || rawCount < 1 || rawCount > MAX_DEMO_STEPS_PER_RUN) {
+          feedback('一度に進める手数は1～1000の整数で指定してください。');
+          return;
+        }
+        runDemoSteps(rawCount);
+      });
+      $('demoStepCount').addEventListener('keydown', event => {
+        if (event.key === 'Enter') $('demoBatchButton').click();
+      });
+
+      $('submitButton').addEventListener('click', submitWord);
+      $('wordForm').addEventListener('submit', (event) => {
+        event.preventDefault();
+        submitWord();
+      });
+
+      $('undoButton').addEventListener('click', () => {
+        if (!state.history.length) return;
+        const removed = state.history.pop();
+        removeLastHistoryEntry();
+        state.turn = removed.player;
+        if (removed.foul) {
+          state.activePlayers[removed.player] = true;
+          if (state.eliminationOrder[state.eliminationOrder.length - 1] === removed.player) state.eliminationOrder.pop();
+          else state.eliminationOrder = state.eliminationOrder.filter(player => player !== removed.player);
+          if (!removed.automatic) state.playerCounts[removed.player] = Math.max(0, state.playerCounts[removed.player] - 1);
+          releaseEntryCache(removed);
+        } else {
+          const validRemoved = state.words.pop();
+          releaseEntryCache(validRemoved);
+          if (validRemoved && validRemoved.indexed && state.fastLookup.get(validRemoved.indexKey) === validRemoved) {
+            state.fastLookup.delete(validRemoved.indexKey);
+          }
+          state.playerCounts[removed.player] = Math.max(0, state.playerCounts[removed.player] - 1);
+        }
+        state.finished = false;
+        state.loser = null;
+        state.winner = null;
+        state.endReason = null;
+        state.noMoveDetail = null;
+        feedback(removed.foul
+          ? `${nameOf(removed.player)}の反則・脱落を取り消しました。`
+          : `「${removed.memo}」を取り消しました。`);
+        render();
+        $('wordInput').focus();
+      });
+
+      $('resetButton').addEventListener('click', () => {
+        if ((state.started || state.history.length) && !window.confirm('これまでの記録を消して、設定画面に戻りますか？')) return;
+        state.started = false;
+        state.demoBatchRunning = false;
+        $('demoStatus').textContent = '開始後に、お手本の続きを再生できます。';
+        $('nonWqoWarning').hidden = true;
+        state.turn = 0;
+        state.words = [];
+        state.history = [];
+        state.playerCounts = Array(state.playerNames.length).fill(0);
+        state.activePlayers = Array(state.playerNames.length).fill(true);
+        state.eliminationOrder = [];
+        state.fastLookup.clear();
+        state.gapMaskBytes = 0;
+        state.finished = false;
+        state.loser = null;
+        state.winner = null;
+        state.endReason = null;
+        state.noMoveDetail = null;
+        showEmptyHistory();
+        feedback('新しいゲームを始めましょう。');
+        render();
+        $('wordInput').focus();
+      });
+
+      $('playerCountSetting').addEventListener('change', () => {
+        if (state.history.length) return;
+        configurePlayerCount($('playerCountSetting').value);
+        feedback(isDemoMode() ? 'お手本モードを選択しました。' : `${state.playerNames.length}人で対局します。`);
+      });
+      $('customAlphabet').addEventListener('input', () => describeRules());
+      ['minLengthFunction', 'maxLengthFunction', 'joinLengthFunction'].forEach(id => {
+        $(id).addEventListener('input', () => describeConstraintFunctions());
+      });
+      settingIds.forEach(id => {
+        $(id).addEventListener('change', () => {
+          render();
+          feedback('判定設定を変更しました。');
+        });
+      });
+
+      renderPlayerCards();
+      showEmptyHistory();
+      render();
+    })();
+  </script>
+</body>
+</html>
