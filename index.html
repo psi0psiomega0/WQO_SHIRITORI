@@ -1977,7 +1977,8 @@
           return result.length >= x && result.length <= y ? result : fallback();
         }
 
-        // ⑥ S' 以外の非空区間がなければ、直前の文字を y 個並べる。
+        // ⑥ S' 以外の非空区間がなければ、S' と元の文字列の左端1文字を削除し、
+        // 残った部分の左側を直前の文字で埋めて全体を y 文字にする。
         let secondRightmost = -1;
         for (let i = lastNonempty - 1; i >= 0; i--) {
           if (intervals[i].length > 0) {
@@ -1985,7 +1986,17 @@
             break;
           }
         }
-        if (secondRightmost < 0) return repeatSubsequenceFirst(precedingChar, y);
+        if (secondRightmost < 0) {
+          const withoutSPrime = intervals.map(part => part.slice());
+          withoutSPrime[lastNonempty] = [];
+          const remainder = joinIntervals(withoutSPrime);
+          // この分岐では S' は右端区間で、他の区間は空。
+          // したがって最左1文字は最大文字の区切り文字に属する。
+          const remainderWithoutLeftmost = remainder.slice(1);
+          const padding = y - remainderWithoutLeftmost.length;
+          if (padding < 0) return fallback();
+          return repeatSubsequenceFirst(precedingChar, padding).concat(Array.from(remainderWithoutLeftmost));
+        }
 
         // ⑦ S' を削除し、2番目に右の非空区間 S'' を再帰的に置換する。
         const SDoublePrime = intervals[secondRightmost];
