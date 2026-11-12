@@ -336,7 +336,7 @@
           <button class="start-button" id="startGameButton" type="button">ゲーム開始</button>
         </div>
         <div class="demo-controls" id="demoControls" hidden>
-          <p class="demo-note">同一文字列・前置部分文字列・後置部分文字列・部分文字列禁止のお手本プレイです。1回に進められるのは最大1000手です。</p>
+          <p class="demo-note">同一文字列・前置部分文字列・後置部分文字列・部分文字列・部分列禁止などのお手本プレイです。1回に進められるのは最大1000手です。</p>
           <button class="demo-button" id="demoNextButton" type="button">次の1手を見る</button>
           <label class="demo-step-label" for="demoStepCount">続きを見る手数
             <input class="demo-step-input" id="demoStepCount" type="number" min="1" max="1000" step="1" value="10">
@@ -425,7 +425,8 @@
         winner: null,
         endReason: null,
         noMoveDetail: null,
-        demoAlphabetSequence: null
+        demoAlphabetSequence: null,
+        demoCommutativeSequence: null
       };
 
       const smallToLarge = {
@@ -1369,8 +1370,10 @@
         if (ending === 'prefix') return '前置部分文字列禁止';
         if (ending === 'suffix') return '後置部分文字列禁止';
         if (ending === 'substring') return '部分文字列禁止';
+        if (ending === 'subsequence') return '部分列禁止';
         if (ending === 'last') return '末尾文字一致禁止';
         if (ending === 'alphabet') return '使用文字包含禁止';
+        if (ending === 'commutative') return '可換部分列禁止';
         return '未対応の終了条件';
       }
 
@@ -1866,6 +1869,315 @@
         ].join('');
       }
 
+      // 部分列禁止のお手本用の長さ範囲。上限は必須。
+      // 相互モードでは、通常モードで下限=上限とした場合と同じ列を作る。
+      function readSubsequenceDemoBounds(rules, turnNumber) {
+        const bounds = readLengthBounds(rules, turnNumber);
+        if (bounds.max === null) {
+          throw new Error('部分列禁止のお手本モードでは、文字数上限を指定してください。');
+        }
+        const maximum = demoSafeIntegerLength(bounds.max, `第${turnNumber}ターン目の文字数上限`);
+        const minimum = rules.reciprocal === 'mutual' ? BigInt(maximum) : bounds.min;
+        return { ...bounds, min: minimum, max: BigInt(maximum) };
+      }
+
+      function repeatSubsequenceFirst(firstChar, length) {
+        return Array(length).fill(firstChar);
+      }
+
+      // next(S,x,y) を再帰的に計算する。S と戻り値は文字まとまりの配列。
+      // x,y は中央部分の長さであり、再帰呼び出しの x は0未満なら0に丸める。
+      function nextSubsequenceMiddle(source, lower, upper, alphabet, firstChar, rankMap, depth = 0) {
+        const S = source.slice();
+        const x = Math.max(0, lower);
+        const y = upper;
+        const fallback = () => repeatSubsequenceFirst(firstChar, Math.max(0, y));
+
+        if (depth > alphabet.length + 2 || y < 0 || x > y || S.length === 0) return fallback();
+
+        const first = S[0];
+        const allSame = S.every(ch => ch === first);
+        if (allSame) {
+          let result;
+          if (first === firstChar) {
+            // ② 最小文字だけの場合は1文字だけ削除する。
+            // 再帰呼び出しでは、この短縮分を呼び出し元の④・⑦が区間補完で処理するため、
+            // ここで x,y に合わせて埋め戻してはいけない。
+            return S.slice(0, -1);
+          }
+          const rank = rankMap.get(first);
+          if (rank === undefined || rank <= 0) return fallback();
+          const padding = y - (S.length - 1);
+          if (padding < 0) return fallback();
+          result = repeatSubsequenceFirst(alphabet[rank - 1], padding).concat(S.slice(1));
+          return result.length >= x && result.length <= y ? result : fallback();
+        }
+
+        // ③ 最大文字で分割し、最大文字間の各区間を得る。
+        let maximumRank = -1;
+        let maximumChar = null;
+        for (const ch of S) {
+          const rank = rankMap.get(ch);
+          if (rank === undefined) throw new Error('部分列禁止のお手本文字列に文字集合外の文字があります。');
+          if (rank > maximumRank) {
+            maximumRank = rank;
+            maximumChar = ch;
+          }
+        }
+        if (maximumRank <= 0) return fallback();
+        const precedingChar = alphabet[maximumRank - 1];
+        const intervals = [[]];
+        for (const ch of S) {
+          if (ch === maximumChar) intervals.push([]);
+          else intervals[intervals.length - 1].push(ch);
+        }
+        const lastNonempty = intervals.reduce((found, part, index) => part.length ? index : found, -1);
+        if (lastNonempty < 0) return fallback();
+
+        const intervalLength = part => part.reduce((total, value) => total + value.length, 0);
+        const totalLength = parts => intervalLength(parts) + parts.length - 1;
+        const joinIntervals = parts => {
+          const result = [];
+          for (let i = 0; i < parts.length; i++) {
+            for (const unit of parts[i]) result.push(unit);
+            if (i < parts.length - 1) result.push(maximumChar);
+          }
+          return result;
+        };
+        const recurse = (part, adjustedLower, adjustedUpper) => {
+          if (adjustedUpper < 0) return null;
+          return nextSubsequenceMiddle(part, Math.max(0, adjustedLower), adjustedUpper, alphabet, firstChar, rankMap, depth + 1);
+        };
+
+        const SPrime = intervals[lastNonempty];
+        if (lastNonempty < intervals.length - 1) {
+          // ④ S' の右隣の区間は空。再帰置換後、必要ならその区間を埋める。
+          const adjustedLower = x + SPrime.length - S.length;
+          const adjustedUpper = y + SPrime.length - S.length;
+          const replacement = recurse(SPrime, adjustedLower, adjustedUpper);
+          if (replacement === null) return fallback();
+          intervals[lastNonempty] = replacement;
+          const currentLength = totalLength(intervals);
+          if (currentLength < y) {
+            intervals[lastNonempty + 1] = repeatSubsequenceFirst(precedingChar, y - currentLength);
+          }
+          const result = joinIntervals(intervals);
+          return result.length >= x && result.length <= y ? result : fallback();
+        }
+
+        // ⑤ S' が右端の区間。
+        const adjustedLower = x + SPrime.length - S.length;
+        const adjustedUpper = y + SPrime.length - S.length;
+        const replacement = recurse(SPrime, adjustedLower, adjustedUpper);
+        if (replacement === null) return fallback();
+        intervals[lastNonempty] = replacement;
+        let resultLength = totalLength(intervals);
+        if (resultLength >= x) {
+          const result = joinIntervals(intervals);
+          return result.length >= x && result.length <= y ? result : fallback();
+        }
+
+        // ⑥ S' 以外の非空区間がなければ、直前の文字を y 個並べる。
+        let secondRightmost = -1;
+        for (let i = lastNonempty - 1; i >= 0; i--) {
+          if (intervals[i].length > 0) {
+            secondRightmost = i;
+            break;
+          }
+        }
+        if (secondRightmost < 0) return repeatSubsequenceFirst(precedingChar, y);
+
+        // ⑦ S' を削除し、2番目に右の非空区間 S'' を再帰的に置換する。
+        const SDoublePrime = intervals[secondRightmost];
+        const adjustedLower2 = x + SDoublePrime.length + SPrime.length - S.length;
+        const adjustedUpper2 = y + SDoublePrime.length + SPrime.length - S.length;
+        const replacement2 = recurse(SDoublePrime, adjustedLower2, adjustedUpper2);
+        if (replacement2 === null) return fallback();
+        intervals[secondRightmost] = replacement2;
+        intervals[lastNonempty] = [];
+        resultLength = totalLength(intervals);
+        if (resultLength < y) {
+          intervals[secondRightmost + 1] = repeatSubsequenceFirst(precedingChar, y - resultLength);
+        }
+        const result = joinIntervals(intervals);
+        return result.length >= x && result.length <= y ? result : fallback();
+      }
+
+      function createSubsequenceDemoCandidate(rules, alphabet, connectionValue) {
+        if (!alphabet.length) throw new Error('使用できる文字集合が空です。');
+        const turnIndex = state.words.length + 1;
+        const connection = demoSafeNonnegativeLength(connectionValue, '接続文字数');
+        const bounds = readSubsequenceDemoBounds(rules, turnIndex);
+        const maximum = demoSafeIntegerLength(bounds.max, `第${turnIndex}ターン目の文字数上限`);
+        const firstChar = alphabet[0];
+        const firstAndLastLength = 2n * connectionValue;
+
+        // 上限が2c以下なら、単語全体を最小文字だけで構成する。
+        if (bounds.max <= firstAndLastLength) {
+          return repeatDemoFirstChar(firstChar, maximum);
+        }
+
+        const middleUpper = demoSafeNonnegativeLength(bounds.max - firstAndLastLength, '部分列禁止のお手本中央部上限');
+        if (turnIndex === 1) {
+          const middle = repeatSubsequenceFirst(alphabet[alphabet.length - 1], middleUpper).join('');
+          return firstChar.repeat(connection) + middle + firstChar.repeat(connection);
+        }
+
+        const previous = state.words[state.words.length - 1];
+        if (!previous) {
+          const middle = repeatSubsequenceFirst(alphabet[alphabet.length - 1], middleUpper).join('');
+          return firstChar.repeat(connection) + middle + firstChar.repeat(connection);
+        }
+        let previousMiddle;
+        if (connection === 0) {
+          previousMiddle = previous.units.slice();
+        } else if (previous.units.length >= 2 * connection) {
+          previousMiddle = previous.units.slice(connection, previous.units.length - connection);
+        } else {
+          previousMiddle = [];
+        }
+
+        // 直前の中央部が空なら、直前の短い単語（すべて最小文字）を含む語を提出して終了させる。
+        if (previousMiddle.length === 0) {
+          return repeatDemoFirstChar(firstChar, maximum);
+        }
+
+        const middleLower = bounds.min === null ? 0 : Math.max(0, Number(bounds.min - firstAndLastLength));
+        const middle = nextSubsequenceMiddle(
+          previousMiddle,
+          middleLower,
+          middleUpper,
+          alphabet,
+          firstChar,
+          new Map(alphabet.map((ch, index) => [ch, index]))
+        );
+        if (middle.length === 0 && connection === 0) {
+          return repeatDemoFirstChar(firstChar, maximum);
+        }
+        return firstChar.repeat(connection) + middle.join('') + firstChar.repeat(connection);
+      }
+
+      // 可換部分列禁止のお手本列。配列の各成分は、文字集合の対応する文字の出現回数。
+      // 相互モードは下限=上限として扱い、通常モードの同じ配列更新規則を使う。
+      function readCommutativeDemoBounds(rules, turnNumber) {
+        const bounds = readLengthBounds(rules, turnNumber);
+        if (bounds.max === null) {
+          throw new Error('可換部分列禁止のお手本モードでは、文字数上限を指定してください。');
+        }
+        const maximum = demoSafeIntegerLength(bounds.max, `第${turnNumber}ターン目の文字数上限`);
+        if (maximum > MAX_DEMO_WORD_UNITS) {
+          throw new Error(`第${turnNumber}ターン目の文字数上限が安全上限の${MAX_DEMO_WORD_UNITS.toLocaleString()}文字を超えています。`);
+        }
+        // 相互モードは、通常モードで下限と上限が一致している場合と同じ列を生成する。
+        return { ...bounds, max: BigInt(maximum), min: rules.reciprocal === 'mutual' ? BigInt(maximum) : bounds.min };
+      }
+
+      function makeCommutativeInitialState(maximum, connection, alphabetSize) {
+        if (maximum <= 2n * connection) return { counts: null, frozen: false };
+        const middleCount = demoSafeNonnegativeLength(maximum - 2n * connection, '可換部分列のお手本配列の合計');
+        const counts = Array(alphabetSize).fill(0);
+        counts[alphabetSize - 1] = middleCount;
+        return { counts, frozen: false };
+      }
+
+      function createInitialCommutativeDemoSequence(rules, alphabet, connection) {
+        if (!alphabet.length) throw new Error('使用できる文字集合が空です。');
+        const bounds = readCommutativeDemoBounds(rules, 1);
+        return [makeCommutativeInitialState(bounds.max, connection, alphabet.length)];
+      }
+
+      function sumCommutativeCounts(counts) {
+        return counts.reduce((sum, value) => sum + value, 0);
+      }
+
+      function makeFrozenCommutativeState(maximum, connection, alphabetSize) {
+        const target = demoSafeNonnegativeLength(maximum - 2n * connection, '可換部分列のお手本配列の合計');
+        const counts = Array(alphabetSize).fill(0);
+        counts[0] = target;
+        return { counts, frozen: true };
+      }
+
+      function advanceCommutativeState(previousState, bounds, connection, alphabetSize) {
+        if (previousState.frozen) {
+          if (bounds.max <= 2n * connection) return { counts: null, frozen: true };
+          return makeFrozenCommutativeState(bounds.max, connection, alphabetSize);
+        }
+        if (bounds.max <= 2n * connection) return { counts: null, frozen: false };
+        const target = demoSafeNonnegativeLength(bounds.max - 2n * connection, '可換部分列のお手本配列の合計');
+
+        if (previousState.counts === null) return makeCommutativeInitialState(bounds.max, connection, alphabetSize);
+
+        const current = previousState.counts;
+        const firstNonzero = current.findIndex(value => value > 0);
+        if (firstNonzero < 0) return makeFrozenCommutativeState(bounds.max, connection, alphabetSize);
+
+        const minimum = bounds.min === null ? 1n : (bounds.min > 1n ? bounds.min : 1n);
+        const canReduceFirst = () => {
+          const resultingLength = 2n * connection + BigInt(sumCommutativeCounts(current) - 1);
+          return resultingLength >= minimum;
+        };
+
+        if (firstNonzero === 0 && canReduceFirst()) {
+          const counts = current.slice();
+          counts[0]--;
+          return { counts, frozen: false };
+        }
+
+        // ①②を適用する成分を選ぶ。通常は最初の非零成分、④の場合は第1成分以外の最初の非零成分。
+        let selectedIndex = firstNonzero;
+        if (firstNonzero === 0) {
+          selectedIndex = current.findIndex((value, index) => index > 0 && value > 0);
+          if (selectedIndex < 0) return makeFrozenCommutativeState(bounds.max, connection, alphabetSize);
+        }
+
+        const counts = current.slice();
+        counts[selectedIndex]--;
+        for (let index = 0; index < selectedIndex; index++) counts[index] = 0;
+        const remaining = target - sumCommutativeCounts(counts);
+        // 上限が非単調な場合など、既存成分だけで目標和を超えてしまうと②を実行できない。
+        if (remaining < 0) return makeFrozenCommutativeState(bounds.max, connection, alphabetSize);
+        counts[selectedIndex - 1] += remaining;
+        return { counts, frozen: false };
+      }
+
+      function createCommutativeDemoCandidate(rules, alphabet, connectionValue) {
+        const turnIndex = state.words.length + 1;
+        const connection = demoSafeNonnegativeLength(connectionValue, '接続文字数');
+        let sequence = state.demoCommutativeSequence;
+        if (!Array.isArray(sequence) || sequence.length === 0) {
+          sequence = createInitialCommutativeDemoSequence(rules, alphabet, connectionValue);
+        } else {
+          sequence = sequence.slice(0, turnIndex);
+        }
+
+        while (sequence.length < turnIndex) {
+          const nextTurn = sequence.length + 1;
+          const nextBounds = readCommutativeDemoBounds(rules, nextTurn);
+          sequence.push(advanceCommutativeState(sequence[sequence.length - 1], nextBounds, connectionValue, alphabet.length));
+        }
+        state.demoCommutativeSequence = sequence;
+
+        const bounds = readCommutativeDemoBounds(rules, turnIndex);
+        const current = sequence[turnIndex - 1];
+        const maximum = demoSafeIntegerLength(bounds.max, `第${turnIndex}ターン目の文字数上限`);
+        const first = alphabet[0];
+        if (current.counts === null || bounds.max <= 2n * connectionValue) {
+          return repeatDemoFirstChar(first, maximum);
+        }
+
+        const middleParts = [];
+        for (let index = 0; index < current.counts.length; index++) {
+          if (current.counts[index] > 0) middleParts.push(alphabet[index].repeat(current.counts[index]));
+        }
+        const middle = middleParts.join('');
+        const requiredLength = 2 * connection + middle.length;
+        const targetLength = BigInt(requiredLength);
+        if (targetLength > bounds.max) {
+          throw new Error('可換部分列のお手本配列が文字数上限を超えています。');
+        }
+        return first.repeat(connection) + middle + first.repeat(connection);
+      }
+
       // 各お手本列を1手だけ生成する。生成候補は必ず通常のsubmitWord()を通し、
       // 長さ・接続・文字集合・禁止条件などの共通判定を受ける。
       function createDemoCandidate(rules, alphabet, c) {
@@ -1874,8 +2186,10 @@
         if (rules.ending === 'same') return createSameDemoCandidate(rules, alphabet, c, previous);
         if (rules.ending === 'last') return createLastDemoCandidate(rules, alphabet, c, previous);
         if (rules.ending === 'alphabet') return createAlphabetDemoCandidate(rules, alphabet, c);
+        if (rules.ending === 'commutative') return createCommutativeDemoCandidate(rules, alphabet, c);
+        if (rules.ending === 'subsequence') return createSubsequenceDemoCandidate(rules, alphabet, c);
         if (rules.ending !== 'prefix' && rules.ending !== 'suffix' && rules.ending !== 'substring') {
-          throw new Error('お手本モードは同一文字列・前置部分文字列・後置部分文字列・部分文字列・使用文字包含禁止（通常・相互モード）・末尾文字一致禁止に対応しています。');
+          throw new Error('お手本モードは同一文字列・前置部分文字列・後置部分文字列・部分文字列・部分列・可換部分列・使用文字包含禁止（通常・相互モード）・末尾文字一致禁止に対応しています。');
         }
 
         const turnIndex = state.words.length + 1;
@@ -1895,7 +2209,7 @@
         let alphabet;
         let c;
         try {
-          alphabet = rules.ending === 'alphabet' ? getAlphabetDemoUnits(rules) : getDemoAlphabet(rules);
+          alphabet = (rules.ending === 'alphabet' || rules.ending === 'commutative' || rules.ending === 'subsequence') ? getAlphabetDemoUnits(rules) : getDemoAlphabet(rules);
           c = getDemoConnectionConstant(rules);
         } catch (error) {
           feedback(error.message);
@@ -2222,8 +2536,8 @@
       function validateGameSettings() {
         const rules = currentRules();
         if (isDemoMode()) {
-          if (!['same', 'prefix', 'suffix', 'substring', 'alphabet', 'last'].includes(rules.ending)) {
-            feedback('現在のお手本モードは「1. 同一文字列禁止」「2. 前置部分文字列禁止」「3. 後置部分文字列禁止」「4. 部分文字列禁止」「8. 使用文字包含禁止（通常・相互モード）」「9. 末尾文字一致禁止」に対応しています。');
+          if (!['same', 'prefix', 'suffix', 'substring', 'subsequence', 'commutative', 'alphabet', 'last'].includes(rules.ending)) {
+            feedback('現在のお手本モードは「1. 同一文字列禁止」「2. 前置部分文字列禁止」「3. 後置部分文字列禁止」「4. 部分文字列禁止」「5. 部分列禁止」「7. 可換部分列禁止」「8. 使用文字包含禁止（通常・相互モード）」「9. 末尾文字一致禁止」に対応しています。');
             return false;
           }
           try {
@@ -2235,6 +2549,14 @@
               const alphabet = getAlphabetDemoUnits(rules);
               const c = getDemoConnectionConstant(rules);
               state.demoAlphabetSequence = createInitialAlphabetDemoSequence(rules, alphabet, c);
+            } else if (rules.ending === 'commutative') {
+              const alphabet = getAlphabetDemoUnits(rules);
+              const c = getDemoConnectionConstant(rules);
+              state.demoCommutativeSequence = createInitialCommutativeDemoSequence(rules, alphabet, c);
+            } else if (rules.ending === 'subsequence') {
+              getAlphabetDemoUnits(rules);
+              getDemoConnectionConstant(rules);
+              readSubsequenceDemoBounds(rules, 1);
             } else {
               getDemoAlphabet(rules);
               getDemoConnectionConstant(rules);
@@ -2510,6 +2832,9 @@
         if (Array.isArray(state.demoAlphabetSequence)) {
           state.demoAlphabetSequence = state.demoAlphabetSequence.slice(0, state.words.length + 1);
         }
+        if (Array.isArray(state.demoCommutativeSequence)) {
+          state.demoCommutativeSequence = state.demoCommutativeSequence.slice(0, state.words.length + 1);
+        }
         state.finished = false;
         state.loser = null;
         state.winner = null;
@@ -2532,6 +2857,7 @@
         state.words = [];
         state.history = [];
         state.demoAlphabetSequence = null;
+        state.demoCommutativeSequence = null;
         state.playerCounts = Array(state.playerNames.length).fill(0);
         state.activePlayers = Array(state.playerNames.length).fill(true);
         state.eliminationOrder = [];
