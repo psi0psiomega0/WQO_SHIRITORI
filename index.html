@@ -1670,23 +1670,28 @@
         return prefix.join('') + nextChar.repeat(remaining);
       }
 
-      // 使用文字包含禁止（通常モード）のお手本列。
+      // 使用文字包含禁止（通常・相互モード）のお手本列。
       // bit列の 1 > 0 の辞書順で、現在の集合より小さく、共通元を持ち、
-      // 要素数が 2..maxCount の集合のうち辞書順最大のものを動的計画法＋貪欲法で求める。
-      function findLexicographicallyMaximalLowerSubset(currentSet, alphabet, maxCountValue) {
+      // 通常モードは要素数 2..maxCount、相互モードは指定された要素数ちょうどの集合を求める。
+      function findLexicographicallyMaximalLowerSubset(currentSet, alphabet, maxCountValue, exactCountValue = null) {
         const n = alphabet.length;
-        const boundedCount = maxCountValue === null
+        const boundedMaximum = maxCountValue === null
           ? BigInt(n)
           : (maxCountValue > BigInt(n) ? BigInt(n) : maxCountValue);
-        const maxCount = Number(boundedCount);
+        const maxCount = Number(boundedMaximum);
+        const exactCount = exactCountValue === null ? null : Number(exactCountValue);
         if (!Number.isSafeInteger(maxCount) || maxCount < 2 || n < 2) return null;
+        if (exactCount !== null && (!Number.isSafeInteger(exactCount) || exactCount < 2 || exactCount > maxCount)) return null;
+        const requiredCount = exactCount === null ? 2 : exactCount;
         const currentMembers = new Set(currentSet);
         const currentBits = alphabet.map(ch => currentMembers.has(ch) ? 1 : 0);
         const memo = new Map();
 
         function canComplete(index, alreadyLess, count, hasCommon) {
-          if (count > maxCount || count + (n - index) < 2) return false;
-          if (index === n) return alreadyLess && count >= 2 && hasCommon;
+          if (count > maxCount || count + (n - index) < requiredCount) return false;
+          if (index === n) {
+            return alreadyLess && hasCommon && (exactCount === null ? count >= 2 : count === exactCount);
+          }
           const key = `${index},${alreadyLess ? 1 : 0},${count},${hasCommon ? 1 : 0}`;
           if (memo.has(key)) return memo.get(key);
           const currentBit = currentBits[index];
@@ -1725,7 +1730,7 @@
           if (selected === null) return null;
           if (selected === 1) result.push(alphabet[index]);
         }
-        return alreadyLess && count >= 2 && hasCommon ? result : null;
+        return alreadyLess && hasCommon && (exactCount === null ? count >= 2 : count === exactCount) ? result : null;
       }
 
       function getAlphabetDemoUnits(rules) {
@@ -1756,17 +1761,28 @@
       function createInitialAlphabetDemoSequence(rules, alphabet, c) {
         if (!alphabet.length) throw new Error('使用できる文字集合が空です。');
         const bounds = readAlphabetDemoBounds(rules, 1);
-        // 上限がなければ全体集合。有限なら |S_1| = 上限 - 2c + 1 を目標にし、
-        // 文字集合の大きさを超える場合は全体集合を採用する。
         let initialCount;
-        if (bounds.max === null) {
-          initialCount = alphabet.length;
-        } else {
-          const requestedCount = bounds.max - 2n * c + 1n;
-          if (requestedCount < 1n) {
+        if (rules.reciprocal === 'mutual') {
+          // 相互モードでは各集合の要素数を固定する。上限なしなら全体集合の半分、
+          // 有限上限なら min(上限 - 2c + 1, floor(|A| / 2)) とする。
+          const halfAlphabet = BigInt(Math.floor(alphabet.length / 2));
+          const byLength = bounds.max === null ? halfAlphabet : bounds.max - 2n * c + 1n;
+          const exactCount = byLength < halfAlphabet ? byLength : halfAlphabet;
+          if (exactCount < 1n) {
             throw new Error('初手の使用文字集合を作れません。文字数上限は接続文字数の2倍以上にしてください。');
           }
-          initialCount = Number(requestedCount > BigInt(alphabet.length) ? BigInt(alphabet.length) : requestedCount);
+          initialCount = Number(exactCount);
+        } else {
+          // 通常モードは従来どおり、上限なしなら全体集合。
+          if (bounds.max === null) {
+            initialCount = alphabet.length;
+          } else {
+            const requestedCount = bounds.max - 2n * c + 1n;
+            if (requestedCount < 1n) {
+              throw new Error('初手の使用文字集合を作れません。文字数上限は接続文字数の2倍以上にしてください。');
+            }
+            initialCount = Number(requestedCount > BigInt(alphabet.length) ? BigInt(alphabet.length) : requestedCount);
+          }
         }
         return [{ set: alphabet.slice(0, initialCount), first: alphabet[0] }];
       }
@@ -1785,13 +1801,24 @@
         while (sequence.length <= turnIndex) {
           const nextTurn = sequence.length + 1;
           const nextBounds = readAlphabetDemoBounds(rules, nextTurn);
-          // S_{i+1} の要素数上限は、第 i+1 ターン目自身の文字数上限から決める。
-          // 上限がなければ要素数上限を設けず、全体集合の大きさまで許す。
+          // S_{i+1} のサイズ条件は、第 i+1 ターン目自身の文字数上限から決める。
+          // 通常モードで上限がなければサイズ上限なし。相互モードでは下の分岐で半分に固定する。
           const nextCapacity = nextBounds.max === null ? null : nextBounds.max - 2n * c + 1n;
           const current = sequence[sequence.length - 1];
-          const selectedSet = nextCapacity !== null && nextCapacity < 2n
-            ? null
-            : findLexicographicallyMaximalLowerSubset(current.set, alphabet, nextCapacity);
+          let selectedSet;
+          if (rules.reciprocal === 'mutual') {
+            // 相互モードは通常モードと同じ辞書順探索を使うが、集合サイズは各ターンでちょうど
+            // min(上限 - 2c + 1, floor(|A| / 2))。上限なしなら floor(|A| / 2)。
+            const halfAlphabet = BigInt(Math.floor(alphabet.length / 2));
+            const exactCount = nextCapacity === null || nextCapacity > halfAlphabet ? halfAlphabet : nextCapacity;
+            selectedSet = exactCount < 2n
+              ? null
+              : findLexicographicallyMaximalLowerSubset(current.set, alphabet, exactCount, exactCount);
+          } else {
+            selectedSet = nextCapacity !== null && nextCapacity < 2n
+              ? null
+              : findLexicographicallyMaximalLowerSubset(current.set, alphabet, nextCapacity);
+          }
           if (selectedSet) {
             const selectedMembers = new Set(selectedSet);
             const commonFirst = alphabet.find(ch => current.set.includes(ch) && selectedMembers.has(ch));
@@ -1846,14 +1873,9 @@
         const previous = state.words.length ? state.words[state.words.length - 1] : null;
         if (rules.ending === 'same') return createSameDemoCandidate(rules, alphabet, c, previous);
         if (rules.ending === 'last') return createLastDemoCandidate(rules, alphabet, c, previous);
-        if (rules.ending === 'alphabet') {
-          if (rules.reciprocal === 'mutual') {
-            throw new Error('使用文字包含禁止のお手本アルゴリズムは通常モード専用です。相互モード用のアルゴリズムは別途実装が必要です。');
-          }
-          return createAlphabetDemoCandidate(rules, alphabet, c);
-        }
+        if (rules.ending === 'alphabet') return createAlphabetDemoCandidate(rules, alphabet, c);
         if (rules.ending !== 'prefix' && rules.ending !== 'suffix' && rules.ending !== 'substring') {
-          throw new Error('お手本モードは同一文字列・前置部分文字列・後置部分文字列・部分文字列・使用文字包含禁止（通常モード）・末尾文字一致禁止に対応しています。');
+          throw new Error('お手本モードは同一文字列・前置部分文字列・後置部分文字列・部分文字列・使用文字包含禁止（通常・相互モード）・末尾文字一致禁止に対応しています。');
         }
 
         const turnIndex = state.words.length + 1;
@@ -2201,11 +2223,7 @@
         const rules = currentRules();
         if (isDemoMode()) {
           if (!['same', 'prefix', 'suffix', 'substring', 'alphabet', 'last'].includes(rules.ending)) {
-            feedback('現在のお手本モードは「1. 同一文字列禁止」「2. 前置部分文字列禁止」「3. 後置部分文字列禁止」「4. 部分文字列禁止」「8. 使用文字包含禁止（通常モード）」「9. 末尾文字一致禁止」に対応しています。');
-            return false;
-          }
-          if (rules.ending === 'alphabet' && rules.reciprocal === 'mutual') {
-            feedback('使用文字包含禁止のお手本アルゴリズムは通常モード専用です。相互モードは別のアルゴリズムとして扱います。');
+            feedback('現在のお手本モードは「1. 同一文字列禁止」「2. 前置部分文字列禁止」「3. 後置部分文字列禁止」「4. 部分文字列禁止」「8. 使用文字包含禁止（通常・相互モード）」「9. 末尾文字一致禁止」に対応しています。');
             return false;
           }
           try {
