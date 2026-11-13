@@ -1387,6 +1387,10 @@
         if (ending === 'last') return '末尾文字一致禁止';
         if (ending === 'alphabet') return '使用文字包含禁止';
         if (ending === 'commutative') return '可換部分列禁止';
+        if (ending === 'rightGap') return '右gap部分列禁止';
+        if (ending === 'rightWeakGap') return '右弱gap部分列禁止';
+        if (ending === 'leftGap') return '左gap部分列禁止';
+        if (ending === 'leftWeakGap') return '左弱gap部分列禁止';
         return '未対応の終了条件';
       }
 
@@ -2260,6 +2264,302 @@
         return first.repeat(connection) + middle + first.repeat(connection);
       }
 
+      // Gap系4規則に共通する S[n] の変換。
+      // alphabet[0] を「あ」、alphabet[1] を「い」とみなす。
+      // ③で選ぶBは「あ」「い」だけからなり、④では正整数配列に符号化する。
+      function transformGapDemoArray(values, amount, depth = 0) {
+        if (!Array.isArray(values) || values.length === 0 || values.some(value => !Number.isSafeInteger(value) || value < 1)) {
+          throw new Error('gapのお手本配列は正整数のみからなる空でない配列でなければなりません。');
+        }
+        if (!Number.isSafeInteger(amount) || amount < 0) {
+          throw new Error('gapのお手本配列のnは0以上の整数でなければなりません。');
+        }
+
+        let current = values.slice();
+        const frames = [];
+        let result;
+        while (true) {
+          let k = 0;
+          for (const value of current) if (value > k) k = value;
+          const allEqual = current.every(value => value === current[0]);
+          if (allEqual) {
+            // ⑧ B=(k,...,k)。Bの最後の成分は1ではないのでk>=2。
+            if (k < 2) throw new Error('gapのお手本配列の等成分分岐でk>=2を満たしません。');
+            const divisor = k - 1;
+            const quotient = Math.floor((amount + k - 1) / divisor);
+            const first = ((amount + k - 1) % divisor) + 1;
+            result = [first];
+            for (let i = 0; i < quotient; i++) result.push(divisor);
+            for (let i = 0; i < current.length - 1; i++) result.push(k);
+            break;
+          }
+
+          // ⑨ Zは末尾の最大値kの最大連続列、Yはその直前のkを含まない最大区間。
+          let zStart = current.length;
+          while (zStart > 0 && current[zStart - 1] === k) zStart--;
+          let xEnd = zStart - 1;
+          while (xEnd >= 0 && current[xEnd] !== k) xEnd--;
+          const X = current.slice(0, xEnd + 1);
+          const Y = current.slice(xEnd + 1, zStart);
+          const Z = current.slice(zStart);
+          if (Y.length === 0) throw new Error('gapのお手本配列の⑨でYを空でない列に分解できません。');
+
+          if (Y[Y.length - 1] === 1) {
+            // ⑩ Yの末尾が1ならZも非空。n-1ではなくnを用いる。
+            if (Z.length === 0) throw new Error('gapのお手本配列の⑩でZが空になりました。');
+            if (k < 2) throw new Error('gapのお手本配列の⑩でk>=2を満たしません。');
+            const divisor = k - 1;
+            const firstAfterK = (amount % divisor) + 1;
+            const quotient = Math.floor(amount / divisor);
+            result = X.concat(Y.slice(0, -1), [k, firstAfterK]);
+            for (let i = 0; i < quotient; i++) result.push(divisor);
+            result = result.concat(Z.slice(0, -1));
+            break;
+          }
+
+          // ⑪ Yの末尾が1でなければY[n]を計算する。kは再帰ごとに減少する。
+          frames.push({ X, Z });
+          current = Y;
+        }
+
+        while (frames.length) {
+          const frame = frames.pop();
+          result = frame.X.concat(result, frame.Z);
+        }
+        return result;
+      }
+
+      function encodeGapDemoArrayAsString(values, minimum, second) {
+        if (!second && values.some(value => value > 1)) {
+          throw new Error('gapのお手本配列を文字列に戻すための2番目の文字がありません。');
+        }
+        let output = '';
+        for (let i = 0; i < values.length; i++) {
+          const runLength = values[i] - 1;
+          if (runLength > 0) output += second.repeat(runLength);
+          if (i + 1 < values.length) output += minimum;
+        }
+        return output;
+      }
+
+      function encodeGapDemoStringAsArray(block, minimum, second) {
+        const values = [];
+        let count = 0;
+        for (const unit of block) {
+          if (unit === minimum) {
+            values.push(count + 1);
+            count = 0;
+          } else if (unit === second) {
+            count++;
+          } else {
+            throw new Error('gapのお手本配列に変換するBに「あ」「い」以外の文字があります。');
+          }
+        }
+        values.push(count + 1);
+        if (values[values.length - 1] === 1) {
+          throw new Error('gapのお手本配列の最後の成分が1になりました。');
+        }
+        return values;
+      }
+
+      function transformGapDemoString(sourceUnits, amount, alphabet, depth = 0) {
+        if (!Array.isArray(sourceUnits) || sourceUnits.length === 0) {
+          throw new Error('S[n]には空でない文字列が必要です。');
+        }
+        if (!Number.isSafeInteger(amount) || amount < 0) {
+          throw new Error('S[n]のnは0以上の整数でなければなりません。');
+        }
+        if (!Array.isArray(alphabet) || alphabet.length === 0) {
+          throw new Error('S[n]の文字集合が空です。');
+        }
+        if (depth > alphabet.length + 2) {
+          throw new Error('S[n]の再帰が想定以上に深くなりました。');
+        }
+
+        const minimum = alphabet[0];
+        const second = alphabet[1];
+        const S = sourceUnits.slice();
+        const length = S.length;
+
+        // ① 右端が「あ」なら右端を削除。
+        if (S[length - 1] === minimum) return S.slice(0, -1);
+
+        // ③で用いる区間を右から探す。
+        // 境界は「あ」または文字列端。区間の中身は「い」だけ（空区間も候補）。
+        const boundaries = [-1];
+        for (let i = 0; i < length; i++) if (S[i] === minimum) boundaries.push(i);
+        boundaries.push(length);
+        let selectedBlock = null;
+        for (let b = boundaries.length - 2; b >= 0; b--) {
+          const leftBoundary = boundaries[b];
+          const rightBoundary = boundaries[b + 1];
+          let onlySecond = true;
+          for (let i = leftBoundary + 1; i < rightBoundary; i++) {
+            if (S[i] !== second) { onlySecond = false; break; }
+          }
+          if (!onlySecond) continue;
+
+          // 区間を左右に「あ」「い」以外が現れる直前まで広げる。
+          let left = leftBoundary + 1;
+          let right = rightBoundary;
+          while (left > 0 && (S[left - 1] === minimum || S[left - 1] === second)) left--;
+          while (right < length && (S[right] === minimum || S[right] === second)) right++;
+
+          // 文字列端でなければ、各端から「あ」をちょうど1つ外す。
+          let valid = true;
+          if (left > 0) {
+            let cursor = left;
+            while (cursor < right && S[cursor] !== minimum) cursor++;
+            if (cursor >= right) valid = false;
+            else left = cursor + 1;
+          }
+          if (valid && right < length) {
+            let cursor = right - 1;
+            while (cursor >= left && S[cursor] !== minimum) cursor--;
+            if (cursor < left) valid = false;
+            else right = cursor;
+          }
+          // Bが空でも有効。空のBは⑤（Bの右端が「あ」の場合）として扱う。
+          if (!valid || right < left) continue;
+
+          const A = S.slice(0, left);
+          const B = S.slice(left, right);
+          const C = S.slice(right);
+          if (A.length && A[A.length - 1] !== minimum) continue;
+          if (C.length && C[0] !== minimum) continue;
+          if (B.some(unit => unit !== minimum && unit !== second)) continue;
+          selectedBlock = { A, B, C };
+          break;
+        }
+
+        // ② 有効区間がなければ、左端を1つ手前の文字n+1個で置換。
+        if (!selectedBlock) {
+          const firstRank = alphabet.indexOf(S[0]);
+          if (firstRank < 0) throw new Error('S[n]の先頭文字が文字集合にありません。');
+          const previous = firstRank > 0 ? alphabet[firstRank - 1] : minimum;
+          return Array(amount + 1).fill(previous).concat(S.slice(1));
+        }
+
+        const { A, B, C } = selectedBlock;
+        // ④ Bの右端が「あ」でなければ、正整数配列に変換してB[n]を計算。
+        if (B.length > 0 && B[B.length - 1] !== minimum) {
+          if (!second) throw new Error('gapのお手本アルゴリズムには2種類以上の文字が必要です。');
+          const values = encodeGapDemoStringAsArray(B, minimum, second);
+          const transformed = transformGapDemoArray(values, amount);
+          const block = encodeGapDemoArrayAsString(transformed, minimum, second);
+          return A.concat(Array.from(block), C);
+        }
+
+        // ⑤ Bの右端が「あ」。C=あDE と分解する。
+        if (!C.length || C[0] !== minimum) {
+          throw new Error('S[n]の⑤でCを「あ」から始まる列として分解できません。');
+        }
+        let dEnd = 1;
+        while (dEnd < C.length && C[dEnd] !== minimum) dEnd++;
+        const D = C.slice(1, dEnd);
+        const E = C.slice(dEnd);
+        if (!D.length || D.includes(minimum) || (E.length && E[0] !== minimum)) {
+          throw new Error('S[n]の⑤でD,Eを正しく分解できません。');
+        }
+
+        // ⑥ Dの右端が「い」。nと|D|を用いて商・剰余を計算する。
+        if (second !== undefined && D[D.length - 1] === second) {
+          const dLength = D.length;
+          const quotient = Math.floor(amount / dLength);
+          const remainder = amount % dLength;
+          const DPrime = D.slice(0, -1);
+          let output = A.concat(B, D);
+          if (remainder === 0) {
+            for (let i = 0; i < quotient; i++) output = output.concat([minimum], DPrime);
+          } else {
+            output.push(minimum);
+            for (let i = 1; i < remainder; i++) output.push(second);
+            for (let i = 0; i < quotient; i++) output = output.concat([minimum], DPrime);
+          }
+          return output.concat(E);
+        }
+
+        // ⑦ Dの右端が「い」でなければ、D[n-|D|]^+。
+        const dLength = D.length;
+        if (amount - dLength < 0) {
+          return A.concat(B, D, [minimum], D.slice(0, amount), E);
+        }
+        if (alphabet.length < 2) {
+          throw new Error('S[n]の⑦には「あ」を除いた文字集合が必要です。');
+        }
+        const transformedD = transformGapDemoString(D, amount - dLength, alphabet.slice(1), depth + 1);
+        return A.concat(B, D, [minimum], transformedD, E);
+      }
+
+      function readGapDemoBounds(rules, turnNumber) {
+        const bounds = readLengthBounds(rules, turnNumber);
+        if (bounds.max === null) {
+          throw new Error('gap系のお手本モードでは、文字数上限を指定してください。');
+        }
+        const maximum = demoSafeIntegerLength(bounds.max, `第${turnNumber}ターン目の文字数上限`);
+        const minimum = rules.reciprocal === 'mutual'
+          ? bounds.max
+          : (bounds.min === null ? 1n : (bounds.min > 1n ? bounds.min : 1n));
+        return { ...bounds, minimum, maximum };
+      }
+
+      function createGapDemoCandidate(rules, alphabet, connectionValue) {
+        if (!alphabet.length) throw new Error('使用できる文字集合が空です。');
+        const connection = demoSafeNonnegativeLength(connectionValue, '接続文字数');
+        const turnIndex = state.words.length + 1;
+        const bounds = readGapDemoBounds(rules, turnIndex);
+        const first = alphabet[0];
+        const twiceConnection = 2 * connection;
+
+        // 上限が2c以下なら、単語全体を最小文字だけで構成する。
+        if (bounds.maximum <= twiceConnection) {
+          return repeatDemoFirstChar(first, bounds.maximum);
+        }
+
+        const middleMaximum = bounds.maximum - twiceConnection;
+        if (turnIndex === 1) {
+          return first.repeat(connection) + alphabet[alphabet.length - 1].repeat(middleMaximum) + first.repeat(connection);
+        }
+
+        const previous = state.words[state.words.length - 1];
+        let previousMiddle = [];
+        if (previous && previous.units.length > twiceConnection) {
+          previousMiddle = previous.units.slice(connection, previous.units.length - connection);
+        }
+
+        // 直前の語に中央部がない場合、ここを中央部の初期状態とする。
+        if (!previousMiddle.length) {
+          return first.repeat(connection) + alphabet[alphabet.length - 1].repeat(middleMaximum) + first.repeat(connection);
+        }
+
+        const makeAllMinimum = () => first.repeat(bounds.maximum);
+        const amount = middleMaximum - previousMiddle.length;
+        // [ ] 内が負なら中央部を最小文字で満たす。
+        if (amount < 0) {
+          return first.repeat(connection) + first.repeat(middleMaximum) + first.repeat(connection);
+        }
+
+        let middle = transformGapDemoString(previousMiddle, amount, alphabet);
+        let totalLength = twiceConnection + middle.length;
+        const inBounds = length => BigInt(length) >= bounds.minimum && BigInt(length) <= bounds.max;
+
+        // 下限に届かなければ、直前の中央部末尾に連続する最小文字を全て除いて再試行。
+        if (!inBounds(totalLength)) {
+          if (BigInt(totalLength) < bounds.minimum) {
+            let trimmed = previousMiddle.slice();
+            while (trimmed.length && trimmed[trimmed.length - 1] === first) trimmed.pop();
+            if (!trimmed.length) return makeAllMinimum();
+            const retryAmount = middleMaximum - trimmed.length;
+            if (retryAmount < 0) return makeAllMinimum();
+            middle = transformGapDemoString(trimmed, retryAmount, alphabet);
+            totalLength = twiceConnection + middle.length;
+          }
+          if (!inBounds(totalLength)) return makeAllMinimum();
+        }
+
+        return first.repeat(connection) + middle.join('') + first.repeat(connection);
+      }
+
       // 各お手本列を1手だけ生成する。生成候補は必ず通常のsubmitWord()を通し、
       // 長さ・接続・文字集合・禁止条件などの共通判定を受ける。
       function createDemoCandidate(rules, alphabet, c) {
@@ -2271,6 +2571,7 @@
         if (rules.ending === 'commutative') return createCommutativeDemoCandidate(rules, alphabet, c);
         if (rules.ending === 'subsequence') return createSubsequenceDemoCandidate(rules, alphabet, c);
         if (rules.ending === 'idempotent') return createIdempotentDemoCandidate(rules, alphabet, c);
+        if (isGapRule(rules.ending)) return createGapDemoCandidate(rules, alphabet, c);
         if (rules.ending !== 'prefix' && rules.ending !== 'suffix' && rules.ending !== 'substring') {
           throw new Error('お手本モードは同一文字列・前置部分文字列・後置部分文字列・部分文字列・部分列・冪等部分列・可換部分列・使用文字包含禁止（通常・相互モード）・末尾文字一致禁止に対応しています。');
         }
@@ -2296,7 +2597,7 @@
         let alphabet;
         let c;
         try {
-          alphabet = (rules.ending === 'alphabet' || rules.ending === 'commutative' || rules.ending === 'subsequence' || rules.ending === 'idempotent') ? getAlphabetDemoUnits(rules) : getDemoAlphabet(rules);
+          alphabet = (rules.ending === 'alphabet' || rules.ending === 'commutative' || rules.ending === 'subsequence' || rules.ending === 'idempotent' || isGapRule(rules.ending)) ? getAlphabetDemoUnits(rules) : getDemoAlphabet(rules);
           c = getDemoConnectionConstant(rules);
         } catch (error) {
           feedback(error.message);
@@ -2669,8 +2970,8 @@
       function validateGameSettings() {
         const rules = currentRules();
         if (isDemoMode()) {
-          if (!['same', 'prefix', 'suffix', 'substring', 'subsequence', 'idempotent', 'commutative', 'alphabet', 'last'].includes(rules.ending)) {
-            feedback('現在のお手本モードは「1. 同一文字列禁止」「2. 前置部分文字列禁止」「3. 後置部分文字列禁止」「4. 部分文字列禁止」「5. 部分列禁止」「6. 冪等部分列禁止」「7. 可換部分列禁止」「8. 使用文字包含禁止（通常・相互モード）」「9. 末尾文字一致禁止」に対応しています。');
+          if (!['same', 'prefix', 'suffix', 'substring', 'subsequence', 'idempotent', 'commutative', 'alphabet', 'last', 'rightGap', 'rightWeakGap', 'leftGap', 'leftWeakGap'].includes(rules.ending)) {
+            feedback('現在のお手本モードは「1. 同一文字列禁止」「2. 前置部分文字列禁止」「3. 後置部分文字列禁止」「4. 部分文字列禁止」「5. 部分列禁止」「6. 冪等部分列禁止」「7. 可換部分列禁止」「8. 使用文字包含禁止（通常・相互モード）」「9. 末尾文字一致禁止」「10～13. gap部分列禁止」に対応しています。');
             return false;
           }
           try {
@@ -2678,7 +2979,13 @@
               feedback('現在のお手本モードでは、接続文字数 f(i) は定数にしてください（例：0、1、2）。');
               return false;
             }
-            if (rules.ending === 'alphabet') {
+            if (isGapRule(rules.ending)) {
+              const alphabet = getAlphabetDemoUnits(rules);
+              if (!alphabet.length) throw new Error('使用できる文字集合が空です。');
+              getDemoConnectionConstant(rules);
+              readGapDemoBounds(rules, 1);
+              readGapDemoBounds(rules, 2);
+            } else if (rules.ending === 'alphabet') {
               const alphabet = getAlphabetDemoUnits(rules);
               const c = getDemoConnectionConstant(rules);
               state.demoAlphabetSequence = createInitialAlphabetDemoSequence(rules, alphabet, c);
