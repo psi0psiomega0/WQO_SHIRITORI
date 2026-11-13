@@ -2264,231 +2264,205 @@
         return first.repeat(connection) + middle + first.repeat(connection);
       }
 
-      // Gap系4規則に共通する S[n] の変換。
-      // alphabet[0] を「あ」、alphabet[1] を「い」とみなす。
-      // ③で選ぶBは「あ」「い」だけからなり、④では正整数配列に符号化する。
-      function transformGapDemoArray(values, amount, depth = 0) {
-        if (!Array.isArray(values) || values.length === 0 || values.some(value => !Number.isSafeInteger(value) || value < 1)) {
-          throw new Error('gapのお手本配列は正整数のみからなる空でない配列でなければなりません。');
+      // Gap系4規則に共通する S[n]_m の変換。
+      // 文字は alphabet 内の順位 0,...,m-1 に符号化し、自然数の順序で比較する。
+      function splitGapRankString(values) {
+        const blocks = [[]];
+        for (const value of values) {
+          if (value === 0) blocks.push([]);
+          else blocks[blocks.length - 1].push(value);
         }
-        if (!Number.isSafeInteger(amount) || amount < 0) {
-          throw new Error('gapのお手本配列のnは0以上の整数でなければなりません。');
-        }
+        return blocks;
+      }
 
-        let current = values.slice();
-        const frames = [];
-        let result;
-        while (true) {
-          let k = 0;
-          for (const value of current) if (value > k) k = value;
-          const allEqual = current.every(value => value === current[0]);
-          if (allEqual) {
-            // ⑧ B=(k,...,k)。Bの最後の成分は1ではないのでk>=2。
-            if (k < 2) throw new Error('gapのお手本配列の等成分分岐でk>=2を満たしません。');
-            const divisor = k - 1;
-            const quotient = Math.floor((amount + k - 1) / divisor);
-            const first = ((amount + k - 1) % divisor) + 1;
-            result = [first];
-            for (let i = 0; i < quotient; i++) result.push(divisor);
-            for (let i = 0; i < current.length - 1; i++) result.push(k);
-            break;
-          }
-
-          // ⑨ Zは末尾の最大値kの最大連続列、Yはその直前のkを含まない最大区間。
-          let zStart = current.length;
-          while (zStart > 0 && current[zStart - 1] === k) zStart--;
-          let xEnd = zStart - 1;
-          while (xEnd >= 0 && current[xEnd] !== k) xEnd--;
-          const X = current.slice(0, xEnd + 1);
-          const Y = current.slice(xEnd + 1, zStart);
-          const Z = current.slice(zStart);
-          if (Y.length === 0) throw new Error('gapのお手本配列の⑨でYを空でない列に分解できません。');
-
-          if (Y[Y.length - 1] === 1) {
-            // ⑩ Yの末尾が1ならZも非空。n-1ではなくnを用いる。
-            if (Z.length === 0) throw new Error('gapのお手本配列の⑩でZが空になりました。');
-            if (k < 2) throw new Error('gapのお手本配列の⑩でk>=2を満たしません。');
-            const divisor = k - 1;
-            const firstAfterK = (amount % divisor) + 1;
-            const quotient = Math.floor(amount / divisor);
-            result = X.concat(Y.slice(0, -1), [k, firstAfterK]);
-            for (let i = 0; i < quotient; i++) result.push(divisor);
-            result = result.concat(Z.slice(0, -1));
-            break;
-          }
-
-          // ⑪ Yの末尾が1でなければY[n]を計算する。kは再帰ごとに減少する。
-          frames.push({ X, Z });
-          current = Y;
-        }
-
-        while (frames.length) {
-          const frame = frames.pop();
-          result = frame.X.concat(result, frame.Z);
+      function joinGapRankBlocks(blocks) {
+        const result = [];
+        for (let i = 0; i < blocks.length; i++) {
+          if (i > 0) result.push(0);
+          for (const value of blocks[i]) result.push(value);
         }
         return result;
       }
 
-      function encodeGapDemoArrayAsString(values, minimum, second) {
-        if (!second && values.some(value => value > 1)) {
-          throw new Error('gapのお手本配列を文字列に戻すための2番目の文字がありません。');
-        }
-        let output = '';
-        for (let i = 0; i < values.length; i++) {
-          const runLength = values[i] - 1;
-          if (runLength > 0) output += second.repeat(runLength);
-          if (i + 1 < values.length) output += minimum;
-        }
-        return output;
-      }
+      // <_m の比較。戻り値は left<right なら -1、等しければ 0、left>right なら 1。
+      function compareGapRankStrings(left, right, m, cache = new Map()) {
+        const leftKey = left.join(',');
+        const rightKey = right.join(',');
+        const key = `${m}|${leftKey};${rightKey}`;
+        if (cache.has(key)) return cache.get(key);
 
-      function encodeGapDemoStringAsArray(block, minimum, second) {
-        const values = [];
-        let count = 0;
-        for (const unit of block) {
-          if (unit === minimum) {
-            values.push(count + 1);
-            count = 0;
-          } else if (unit === second) {
-            count++;
+        let result = 0;
+        if (left.length === right.length && left.every((value, index) => value === right[index])) {
+          result = 0;
+        } else if (m === 1) {
+          result = left.length < right.length ? -1 : left.length > right.length ? 1 : 0;
+        } else if (left.length === 0 || right.length === 0) {
+          result = left.length === 0 ? (right.length === 0 ? 0 : -1) : 1;
+        } else {
+          const leftBlocks = splitGapRankString(left);
+          const rightBlocks = splitGapRankString(right);
+          const leftLower = leftBlocks.map(block => block.map(value => value - 1));
+          const rightLower = rightBlocks.map(block => block.map(value => value - 1));
+
+          const findMaximum = blocks => {
+            let maximum = blocks[0];
+            for (let i = 1; i < blocks.length; i++) {
+              if (compareGapRankStrings(blocks[i], maximum, m - 1, cache) > 0) maximum = blocks[i];
+            }
+            return maximum;
+          };
+          const leftMaximum = findMaximum(leftLower);
+          const rightMaximum = findMaximum(rightLower);
+          const maximumComparison = compareGapRankStrings(leftMaximum, rightMaximum, m - 1, cache);
+
+          if (maximumComparison !== 0) {
+            result = maximumComparison;
           } else {
-            throw new Error('gapのお手本配列に変換するBに「あ」「い」以外の文字があります。');
+            const leftMaximumCount = leftLower.filter(block => compareGapRankStrings(block, leftMaximum, m - 1, cache) === 0).length;
+            const rightMaximumCount = rightLower.filter(block => compareGapRankStrings(block, rightMaximum, m - 1, cache) === 0).length;
+            if (leftMaximumCount !== rightMaximumCount) {
+              result = leftMaximumCount < rightMaximumCount ? -1 : 1;
+            } else {
+              // 最大ブロックが最初に現れる位置より前の部分を比較する。
+              // 定義の i<p は末尾ブロックだけが最大の場合に未定義となるため、i<=p とする。
+              // 位置の違いを失わないよう、前半・後半には最大ブロックとの境界の0も含める。
+              const leftFirstMaximum = leftLower.findIndex(block => compareGapRankStrings(block, leftMaximum, m - 1, cache) === 0);
+              const rightFirstMaximum = rightLower.findIndex(block => compareGapRankStrings(block, rightMaximum, m - 1, cache) === 0);
+              const leftPrefix = joinGapRankBlocks(leftBlocks.slice(0, leftFirstMaximum)).concat(leftFirstMaximum > 0 ? [0] : []);
+              const rightPrefix = joinGapRankBlocks(rightBlocks.slice(0, rightFirstMaximum)).concat(rightFirstMaximum > 0 ? [0] : []);
+              result = compareGapRankStrings(leftPrefix, rightPrefix, m, cache);
+              if (result === 0) {
+                const leftSuffix = (leftFirstMaximum < leftBlocks.length - 1 ? [0] : []).concat(joinGapRankBlocks(leftBlocks.slice(leftFirstMaximum + 1)));
+                const rightSuffix = (rightFirstMaximum < rightBlocks.length - 1 ? [0] : []).concat(joinGapRankBlocks(rightBlocks.slice(rightFirstMaximum + 1)));
+                result = compareGapRankStrings(leftSuffix, rightSuffix, m, cache);
+              }
+            }
           }
         }
-        values.push(count + 1);
-        if (values[values.length - 1] === 1) {
-          throw new Error('gapのお手本配列の最後の成分が1になりました。');
-        }
-        return values;
+
+        cache.set(key, result);
+        cache.set(`${m}|${rightKey};${leftKey}`, -result);
+        return result;
       }
 
-      function transformGapDemoString(sourceUnits, amount, alphabet, depth = 0) {
-        if (!Array.isArray(sourceUnits) || sourceUnits.length === 0) {
-          throw new Error('S[n]には空でない文字列が必要です。');
+      function transformGapRankString(values, amount, m, orderCache = new Map()) {
+        if (!Array.isArray(values) || values.some(value => !Number.isSafeInteger(value) || value < 0 || value >= m)) {
+          throw new Error('gapのお手本文字列を自然数列に変換できません。');
         }
         if (!Number.isSafeInteger(amount) || amount < 0) {
-          throw new Error('S[n]のnは0以上の整数でなければなりません。');
+          throw new Error('S[n]_m のnは0以上の整数でなければなりません。');
+        }
+        if (!Number.isSafeInteger(m) || m < 1) {
+          throw new Error('S[n]_m の文字種類数mは1以上でなければなりません。');
+        }
+
+        const length = values.length;
+        if (length === 0) return [];
+        // m=1 の基底写像 [ ]_1 は、nによらず末尾を1文字取り除く。
+        if (m === 1) return values.slice(0, -1);
+
+        const hasZero = values.includes(0);
+        const last = values[length - 1];
+
+        // 0が現れない場合。
+        if (!hasZero) {
+          if (last === 1) {
+            const prefix = values.slice(0, -1);
+            const targetLength = length + amount;
+            if (targetLength === 0) return [];
+            // S' 0 S' 0 ... S' の右端 targetLength 文字を取る。
+            const extended = [];
+            while (extended.length < targetLength) {
+              for (const value of prefix) extended.push(value);
+              extended.push(0);
+            }
+            for (const value of prefix) extended.push(value);
+            return extended.slice(-targetLength);
+          }
+          // S[n]_m = (S^-[n]_{m-1})^+。
+          const lowered = values.map(value => value - 1);
+          return transformGapRankString(lowered, amount, m - 1, orderCache).map(value => value + 1);
+        }
+
+        // 末尾が0なら、末尾の0を1つ取り除く。
+        if (last === 0) return values.slice(0, -1);
+
+        const blocks = splitGapRankString(values);
+        const p = blocks.length - 1;
+        const allEqual = blocks.every(block =>
+          block.length === blocks[0].length && block.every((value, index) => value === blocks[0][index])
+        );
+
+        // S_0,...,S_p が全て等しい場合。
+        if (allEqual) {
+          const transformedFirst = transformGapRankString(blocks[0], amount, m, orderCache);
+          return transformedFirst.concat([0], joinGapRankBlocks(blocks.slice(1)));
+        }
+
+        // 各 S_i^- の <_{m-1}-最大値を求め、その最後の出現位置を p' とする。
+        const loweredBlocks = blocks.map(block => block.map(value => value - 1));
+        let maximum = loweredBlocks[0];
+        for (let i = 1; i < loweredBlocks.length; i++) {
+          if (compareGapRankStrings(loweredBlocks[i], maximum, m - 1, orderCache) > 0) maximum = loweredBlocks[i];
+        }
+        let pPrime = -1;
+        for (let i = 0; i < loweredBlocks.length; i++) {
+          if (compareGapRankStrings(loweredBlocks[i], maximum, m - 1, orderCache) === 0) pPrime = i;
+        }
+
+        if (pPrime === p && blocks[p - 1].length === 0) {
+          const finalBlock = blocks[p];
+          let transformedFinal;
+          if (amount >= finalBlock.length) {
+            transformedFinal = transformGapRankString(finalBlock, amount - finalBlock.length, m, orderCache);
+          } else {
+            // n<|S_p| の場合、max(S_p) を含む長さnの連続部分列のうち最も右のもの。
+            if (amount === 0) {
+              transformedFinal = [];
+            } else {
+              let maximumSymbol = -1;
+              let rightmostMaximum = -1;
+              for (let i = 0; i < finalBlock.length; i++) {
+                if (finalBlock[i] >= maximumSymbol) {
+                  maximumSymbol = finalBlock[i];
+                  rightmostMaximum = i;
+                }
+              }
+              const start = Math.min(rightmostMaximum, finalBlock.length - amount);
+              transformedFinal = finalBlock.slice(start, start + amount);
+            }
+          }
+          // S_0 0 ... 0 S_{p-2} 0 S_p 0 S_p[...]
+          const leading = joinGapRankBlocks(blocks.slice(0, p - 1));
+          // p=1 では S_{p-2} が存在しないため、先頭の区切り0も付けない。
+          return leading.concat(p >= 2 ? [0] : [], finalBlock, [0], transformedFinal);
+        }
+
+        if (pPrime === p) {
+          // (S_0 0 ... 0 S_{p-1})[n]_m 0 S_p
+          const prefix = joinGapRankBlocks(blocks.slice(0, p));
+          return transformGapRankString(prefix, amount, m, orderCache).concat([0], blocks[p]);
+        }
+
+        // S_0 0 ... 0 S_{p'} 0 (S_{p'+1} 0 ... 0 S_p)[n]_m
+        const prefix = joinGapRankBlocks(blocks.slice(0, pPrime + 1));
+        const suffix = joinGapRankBlocks(blocks.slice(pPrime + 1));
+        return prefix.concat([0], transformGapRankString(suffix, amount, m, orderCache));
+      }
+
+      function transformGapDemoString(sourceUnits, amount, alphabet) {
+        if (!Array.isArray(sourceUnits) || sourceUnits.length === 0) {
+          throw new Error('S[n]_m には空でない文字列が必要です。');
         }
         if (!Array.isArray(alphabet) || alphabet.length === 0) {
-          throw new Error('S[n]の文字集合が空です。');
+          throw new Error('S[n]_m の文字集合が空です。');
         }
-        if (depth > alphabet.length + 2) {
-          throw new Error('S[n]の再帰が想定以上に深くなりました。');
-        }
-
-        const minimum = alphabet[0];
-        const second = alphabet[1];
-        const S = sourceUnits.slice();
-        const length = S.length;
-
-        // ① 右端が「あ」なら右端を削除。
-        if (S[length - 1] === minimum) return S.slice(0, -1);
-
-        // ③で用いる区間を右から探す。
-        // 境界は「あ」または文字列端。区間の中身は「い」だけ（空区間も候補）。
-        const boundaries = [-1];
-        for (let i = 0; i < length; i++) if (S[i] === minimum) boundaries.push(i);
-        boundaries.push(length);
-        let selectedBlock = null;
-        for (let b = boundaries.length - 2; b >= 0; b--) {
-          const leftBoundary = boundaries[b];
-          const rightBoundary = boundaries[b + 1];
-          let onlySecond = true;
-          for (let i = leftBoundary + 1; i < rightBoundary; i++) {
-            if (S[i] !== second) { onlySecond = false; break; }
-          }
-          if (!onlySecond) continue;
-
-          // 区間を左右に「あ」「い」以外が現れる直前まで広げる。
-          let left = leftBoundary + 1;
-          let right = rightBoundary;
-          while (left > 0 && (S[left - 1] === minimum || S[left - 1] === second)) left--;
-          while (right < length && (S[right] === minimum || S[right] === second)) right++;
-
-          // 文字列端でなければ、各端から「あ」をちょうど1つ外す。
-          let valid = true;
-          if (left > 0) {
-            let cursor = left;
-            while (cursor < right && S[cursor] !== minimum) cursor++;
-            if (cursor >= right) valid = false;
-            else left = cursor + 1;
-          }
-          if (valid && right < length) {
-            let cursor = right - 1;
-            while (cursor >= left && S[cursor] !== minimum) cursor--;
-            if (cursor < left) valid = false;
-            else right = cursor;
-          }
-          // Bが空でも有効。空のBは⑤（Bの右端が「あ」の場合）として扱う。
-          if (!valid || right < left) continue;
-
-          const A = S.slice(0, left);
-          const B = S.slice(left, right);
-          const C = S.slice(right);
-          if (A.length && A[A.length - 1] !== minimum) continue;
-          if (C.length && C[0] !== minimum) continue;
-          if (B.some(unit => unit !== minimum && unit !== second)) continue;
-          selectedBlock = { A, B, C };
-          break;
-        }
-
-        // ② 有効区間がなければ、左端を1つ手前の文字n+1個で置換。
-        if (!selectedBlock) {
-          const firstRank = alphabet.indexOf(S[0]);
-          if (firstRank < 0) throw new Error('S[n]の先頭文字が文字集合にありません。');
-          const previous = firstRank > 0 ? alphabet[firstRank - 1] : minimum;
-          return Array(amount + 1).fill(previous).concat(S.slice(1));
-        }
-
-        const { A, B, C } = selectedBlock;
-        // ④ Bの右端が「あ」でなければ、正整数配列に変換してB[n]を計算。
-        if (B.length > 0 && B[B.length - 1] !== minimum) {
-          if (!second) throw new Error('gapのお手本アルゴリズムには2種類以上の文字が必要です。');
-          const values = encodeGapDemoStringAsArray(B, minimum, second);
-          const transformed = transformGapDemoArray(values, amount);
-          const block = encodeGapDemoArrayAsString(transformed, minimum, second);
-          return A.concat(Array.from(block), C);
-        }
-
-        // ⑤ Bの右端が「あ」。C=あDE と分解する。
-        if (!C.length || C[0] !== minimum) {
-          throw new Error('S[n]の⑤でCを「あ」から始まる列として分解できません。');
-        }
-        let dEnd = 1;
-        while (dEnd < C.length && C[dEnd] !== minimum) dEnd++;
-        const D = C.slice(1, dEnd);
-        const E = C.slice(dEnd);
-        if (!D.length || D.includes(minimum) || (E.length && E[0] !== minimum)) {
-          throw new Error('S[n]の⑤でD,Eを正しく分解できません。');
-        }
-
-        // ⑥ Dの右端が「い」。nと|D|を用いて商・剰余を計算する。
-        if (second !== undefined && D[D.length - 1] === second) {
-          const dLength = D.length;
-          const quotient = Math.floor(amount / dLength);
-          const remainder = amount % dLength;
-          const DPrime = D.slice(0, -1);
-          let output = A.concat(B, D);
-          if (remainder === 0) {
-            for (let i = 0; i < quotient; i++) output = output.concat([minimum], DPrime);
-          } else {
-            output.push(minimum);
-            for (let i = 1; i < remainder; i++) output.push(second);
-            for (let i = 0; i < quotient; i++) output = output.concat([minimum], DPrime);
-          }
-          return output.concat(E);
-        }
-
-        // ⑦ Dの右端が「い」でなければ、D[n-|D|]^+。
-        const dLength = D.length;
-        if (amount - dLength < 0) {
-          return A.concat(B, D, [minimum], D.slice(0, amount), E);
-        }
-        if (alphabet.length < 2) {
-          throw new Error('S[n]の⑦には「あ」を除いた文字集合が必要です。');
-        }
-        const transformedD = transformGapDemoString(D, amount - dLength, alphabet.slice(1), depth + 1);
-        return A.concat(B, D, [minimum], transformedD, E);
+        const ranks = sourceUnits.map(unit => {
+          const rank = alphabet.indexOf(unit);
+          if (rank < 0) throw new Error('S[n]_m の文字列に文字集合外の文字があります。');
+          return rank;
+        });
+        return transformGapRankString(ranks, amount, alphabet.length).map(rank => alphabet[rank]);
       }
 
       function readGapDemoBounds(rules, turnNumber) {
