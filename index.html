@@ -118,6 +118,9 @@
     .submit-button:hover { background: var(--green-dark); }
     .submit-button:active { transform: translateY(1px); }
     .submit-button:disabled, .word-input:disabled { opacity: .48; cursor: not-allowed; }
+    .connection-toggle { display: flex; align-items: center; justify-content: center; gap: 8px; width: fit-content; max-width: 100%; margin: 11px auto 0; color: #657468; font-size: 12px; cursor: pointer; user-select: none; }
+    .connection-toggle input { width: 16px; height: 16px; margin: 0; accent-color: var(--green); cursor: pointer; }
+    .connection-toggle[hidden] { display: none !important; }
     .input-note { margin: 8px 0 0; color: #92988f; text-align: center; font-size: 11px; line-height: 1.5; }
     .feedback { min-height: 25px; margin: 12px 0 0; color: var(--red); text-align: center; font-size: 13px; }
     .feedback.success { color: var(--green); }
@@ -323,7 +326,7 @@
             </label>
           </div>
           <div class="function-preview" id="functionPreview">iは1始まりのターン番号です。下限・上限は実数値で計算した後、それぞれfloorで整数化します。f(1)は使わず、f(i)は第i−1ターン目と第iターン目の間（i≧2）に適用します。</div>
-          <p class="setting-help" style="margin-top:8px">式では i、+ − * / ^、小数、括弧、min、max、abs、floor、ceil、sqrt、exp(a,b)、log(a,b)、root(a,n)、slog(a) を使用できます。exp(a,b)=a^b、log(a,b)=log_a(b)、root(a,n)=aのn乗根です。slogは底2の反復対数回数（従来のlogstar）です。長さの下限・上限と接続文字数は、実数計算後にfloorで整数化します。式は安全な数式として解析し、JavaScriptコードとしては実行しません。</p>
+          <p class="setting-help" style="margin-top:8px">式では i、+ − * / ^、小数、括弧、min、max、abs、floor、ceil、sqrt、exp(a,b)、log(a,b)、root(a,n)、slog(a) を使用できます。exp(a,b)=a^b、log(a,b)=log_a(b)、root(a,n)=aのn乗根です。slogは底2の連続反復対数で、0≤x<1ではx−1、x≥1では1+slog(log₂x)とします。長さの下限・上限と接続文字数は、実数計算後にfloorで整数化します。式は安全な数式として解析し、JavaScriptコードとしては実行しません。</p>
           <p class="setting-help">例：下限と上限をどちらも <code>i+1</code>、接続文字数を <code>i</code> にすると、第iターン目はi+1文字で、前ターンの末尾i文字と接続します。</p>
         </section>
 
@@ -336,7 +339,7 @@
           <button class="start-button" id="startGameButton" type="button">ゲーム開始</button>
         </div>
         <div class="demo-controls" id="demoControls" hidden>
-          <p class="demo-note">同一文字列・前置部分文字列・後置部分文字列・部分文字列・部分列禁止などのお手本プレイです。1回に進められるのは最大1000手です。</p>
+          <p class="demo-note">同一文字列・前置部分文字列・後置部分文字列・部分文字列・部分列禁止・冪等部分列禁止などのお手本プレイです。1回に進められるのは最大1000手です。</p>
           <button class="demo-button" id="demoNextButton" type="button">次の1手を見る</button>
           <label class="demo-step-label" for="demoStepCount">続きを見る手数
             <input class="demo-step-input" id="demoStepCount" type="number" min="1" max="1000" step="1" value="10">
@@ -360,6 +363,10 @@
           <input class="word-input" id="wordInput" type="text" inputmode="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="ことばを入力（例：りんご）" aria-label="しりとりのことば">
           <button class="submit-button" id="submitButton" type="button">決定する →</button>
         </form>
+        <label class="connection-toggle" id="connectionToggleWrap" for="autoInsertConnection">
+          <input id="autoInsertConnection" type="checkbox">
+          接続文字を入力欄に自動で入れる
+        </label>
         <p class="input-note" id="inputNote">入力文字数に上限はありません。非常に長い文字列では端末性能に応じて処理に時間がかかることがあります。</p>
         <p class="feedback" id="feedback" role="status"></p>
 
@@ -426,7 +433,9 @@
         endReason: null,
         noMoveDetail: null,
         demoAlphabetSequence: null,
-        demoCommutativeSequence: null
+        demoCommutativeSequence: null,
+        autoInsertConnection: false,
+        autoInsertedPrefix: ''
       };
 
       const smallToLarge = {
@@ -743,12 +752,12 @@
           if (value < 0) throw new Error('slog() の引数は0以上にしてください。');
           let current = value;
           let count = 0;
-          while (current > 1) {
+          while (current >= 1) {
             current = Math.log2(current);
             count++;
             if (count > 2048) throw new Error('slog() の反復回数が上限を超えました。');
           }
-          return count;
+          return checkedReal(count + current - 1);
         }
         throw new Error('未対応の関数です。');
       }
@@ -1371,6 +1380,7 @@
         if (ending === 'suffix') return '後置部分文字列禁止';
         if (ending === 'substring') return '部分文字列禁止';
         if (ending === 'subsequence') return '部分列禁止';
+        if (ending === 'idempotent') return '冪等部分列禁止';
         if (ending === 'last') return '末尾文字一致禁止';
         if (ending === 'alphabet') return '使用文字包含禁止';
         if (ending === 'commutative') return '可換部分列禁止';
@@ -2068,6 +2078,64 @@
         return firstChar.repeat(connection) + middle.join('') + firstChar.repeat(connection);
       }
 
+      // 冪等部分列禁止のお手本列。
+      // 中央部の文字列 S は最小文字を除いた文字集合で生成し、各文字の間に最小文字を挟む。
+      function createIdempotentDemoCandidate(rules, alphabet, connectionValue) {
+        if (alphabet.length < 2) {
+          throw new Error('冪等部分列禁止のお手本には、五十音順（または設定順）で最初の2種類以上の文字が必要です。');
+        }
+        const turnIndex = state.words.length + 1;
+        const connection = demoSafeNonnegativeLength(connectionValue, '接続文字数');
+        const bounds = readLengthBounds(rules, turnIndex);
+        if (bounds.max === null) {
+          throw new Error('冪等部分列禁止のお手本モードでは、文字数上限を指定してください。');
+        }
+        const maximum = demoSafeIntegerLength(bounds.max, `第${turnIndex}ターン目の文字数上限`);
+        const firstChar = alphabet[0];
+        const secondChar = alphabet[1];
+        const leftBoundary = Array.from({ length: connection }, (_, index) => alphabet[index % 2]).join('');
+
+        // 上限が2c以下なら、単語全体を最初の2文字の交互列にする。
+        if (BigInt(maximum) <= 2n * connectionValue) {
+          return Array.from({ length: maximum }, (_, index) => alphabet[index % 2]).join('');
+        }
+
+        const middleLength = maximum - 2 * connection;
+        const q = Math.floor((middleLength + 1) / 2);
+        const centralAlphabet = alphabet.slice(1);
+        const centralFirst = centralAlphabet[0];
+        const centralLast = centralAlphabet[centralAlphabet.length - 1];
+        const rankMap = new Map(centralAlphabet.map((ch, index) => [ch, index]));
+        const previous = state.words[state.words.length - 1] || null;
+        let source;
+
+        // 先行ターンが2c以下で中央部を持たない場合は、ここを中央列の初期状態とする。
+        if (!previous || previous.units.length <= 2 * connection) {
+          source = Array(q).fill(centralLast);
+        } else {
+          const previousMiddle = previous.units.slice(connection, previous.units.length - connection);
+          // 中央部では最小文字が区切り・右詰めにのみ使われるため、取り除けば S を復元できる。
+          source = previousMiddle.filter(ch => ch !== firstChar);
+          if (source.some(ch => !rankMap.has(ch))) {
+            throw new Error('冪等部分列禁止のお手本の中央部に、想定外の文字が含まれています。');
+          }
+          const lower = rules.reciprocal === 'mutual' ? q : 0;
+          source = nextSubsequenceMiddle(source, lower, q, centralAlphabet, centralFirst, rankMap);
+        }
+
+        // S の各文字の間に最小文字を挟み、残りは中央部の右端を最小文字で埋める。
+        const middle = [];
+        for (let index = 0; index < source.length; index++) {
+          if (index > 0) middle.push(firstChar);
+          middle.push(source[index]);
+        }
+        while (middle.length < middleLength) middle.push(firstChar);
+        if (middle.length !== middleLength) {
+          throw new Error('冪等部分列禁止のお手本の中央部が、指定された文字数に一致しません。');
+        }
+        return leftBoundary + middle.join('') + leftBoundary;
+      }
+
       // 可換部分列禁止のお手本列。配列の各成分は、文字集合の対応する文字の出現回数。
       // 相互モードは下限=上限として扱い、通常モードの同じ配列更新規則を使う。
       function readCommutativeDemoBounds(rules, turnNumber) {
@@ -2199,8 +2267,9 @@
         if (rules.ending === 'alphabet') return createAlphabetDemoCandidate(rules, alphabet, c);
         if (rules.ending === 'commutative') return createCommutativeDemoCandidate(rules, alphabet, c);
         if (rules.ending === 'subsequence') return createSubsequenceDemoCandidate(rules, alphabet, c);
+        if (rules.ending === 'idempotent') return createIdempotentDemoCandidate(rules, alphabet, c);
         if (rules.ending !== 'prefix' && rules.ending !== 'suffix' && rules.ending !== 'substring') {
-          throw new Error('お手本モードは同一文字列・前置部分文字列・後置部分文字列・部分文字列・部分列・可換部分列・使用文字包含禁止（通常・相互モード）・末尾文字一致禁止に対応しています。');
+          throw new Error('お手本モードは同一文字列・前置部分文字列・後置部分文字列・部分文字列・部分列・冪等部分列・可換部分列・使用文字包含禁止（通常・相互モード）・末尾文字一致禁止に対応しています。');
         }
 
         const turnIndex = state.words.length + 1;
@@ -2220,7 +2289,7 @@
         let alphabet;
         let c;
         try {
-          alphabet = (rules.ending === 'alphabet' || rules.ending === 'commutative' || rules.ending === 'subsequence') ? getAlphabetDemoUnits(rules) : getDemoAlphabet(rules);
+          alphabet = (rules.ending === 'alphabet' || rules.ending === 'commutative' || rules.ending === 'subsequence' || rules.ending === 'idempotent') ? getAlphabetDemoUnits(rules) : getDemoAlphabet(rules);
           c = getDemoConnectionConstant(rules);
         } catch (error) {
           feedback(error.message);
@@ -2397,6 +2466,47 @@
           registerFoul(entry, true);
         }
       }
+      function getRequiredConnectionPrefix() {
+        if (!state.started || state.finished || isDemoMode()) return '';
+        const previous = state.words.length ? state.words[state.words.length - 1] : null;
+        return previous && previous.nextJoinCount > 0 && previous.next ? String(previous.next) : '';
+      }
+
+      // 自動挿入した接続文字だけを差し替える。入力済みの残りの文字は保持する。
+      function syncConnectionInput() {
+        const input = $('wordInput');
+        const oldPrefix = state.autoInsertedPrefix || '';
+        let content = input.value;
+        const hadAutoPrefix = Boolean(oldPrefix && content.startsWith(oldPrefix));
+        if (hadAutoPrefix) content = content.slice(oldPrefix.length);
+
+        if (!state.autoInsertConnection) {
+          if (hadAutoPrefix) input.value = content;
+          state.autoInsertedPrefix = '';
+          return;
+        }
+
+        const required = getRequiredConnectionPrefix();
+        if (!required) {
+          if (hadAutoPrefix) input.value = content;
+          state.autoInsertedPrefix = '';
+          return;
+        }
+
+        if (hadAutoPrefix || !content.startsWith(required)) {
+          input.value = required + content;
+          state.autoInsertedPrefix = required;
+          if (document.activeElement === input) {
+            const caret = required.length;
+            input.setSelectionRange(caret, caret);
+          }
+        } else {
+          // 接続文字が手入力済みなら、自動挿入分としては管理しない。
+          input.value = content;
+          state.autoInsertedPrefix = '';
+        }
+      }
+
       function getRanking() {
         const ranking = [];
         if (state.winner !== null) ranking.push(state.winner);
@@ -2431,6 +2541,9 @@
             : `${activePlayerIndexes().length}人参加中 · 反則した人は脱落し、残りの人で続行します。`;
         $('demoControls').hidden = !isDemoMode() || !state.started || state.finished;
         $('wordForm').hidden = isDemoMode();
+        $('connectionToggleWrap').hidden = isDemoMode();
+        $('autoInsertConnection').checked = state.autoInsertConnection;
+        $('autoInsertConnection').disabled = isDemoMode() || state.finished;
         $('inputNote').hidden = isDemoMode();
         $('demoNextButton').disabled = !state.started || state.finished;
         $('demoBatchButton').disabled = !state.started || state.finished;
@@ -2540,6 +2653,7 @@
           $('wordInput').placeholder = previous ? (previous.nextJoinCount ? `「${previous.next}」から始まる文字列` : '接続制限なしで入力') : '文字列を入力';
         }
         $('undoButton').disabled = state.history.length === 0;
+        syncConnectionInput();
         const foulCount = state.history.filter(entry => entry.foul).length;
         $('historyCount').textContent = `${state.words.length} 有効ターン · ${foulCount} 反則`;
       }
@@ -2547,8 +2661,8 @@
       function validateGameSettings() {
         const rules = currentRules();
         if (isDemoMode()) {
-          if (!['same', 'prefix', 'suffix', 'substring', 'subsequence', 'commutative', 'alphabet', 'last'].includes(rules.ending)) {
-            feedback('現在のお手本モードは「1. 同一文字列禁止」「2. 前置部分文字列禁止」「3. 後置部分文字列禁止」「4. 部分文字列禁止」「5. 部分列禁止」「7. 可換部分列禁止」「8. 使用文字包含禁止（通常・相互モード）」「9. 末尾文字一致禁止」に対応しています。');
+          if (!['same', 'prefix', 'suffix', 'substring', 'subsequence', 'idempotent', 'commutative', 'alphabet', 'last'].includes(rules.ending)) {
+            feedback('現在のお手本モードは「1. 同一文字列禁止」「2. 前置部分文字列禁止」「3. 後置部分文字列禁止」「4. 部分文字列禁止」「5. 部分列禁止」「6. 冪等部分列禁止」「7. 可換部分列禁止」「8. 使用文字包含禁止（通常・相互モード）」「9. 末尾文字一致禁止」に対応しています。');
             return false;
           }
           try {
@@ -2568,6 +2682,15 @@
               getAlphabetDemoUnits(rules);
               getDemoConnectionConstant(rules);
               readSubsequenceDemoBounds(rules, 1);
+            } else if (rules.ending === 'idempotent') {
+              const alphabet = getAlphabetDemoUnits(rules);
+              if (alphabet.length < 2) throw new Error('文字集合に少なくとも2種類の文字を設定してください。');
+              getDemoConnectionConstant(rules);
+              for (const turn of [1, 2]) {
+                const bounds = readLengthBounds(rules, turn);
+                if (bounds.max === null) throw new Error('文字数上限を指定してください。');
+                demoSafeIntegerLength(bounds.max, `第${turn}ターン目の文字数上限`);
+              }
             } else {
               getDemoAlphabet(rules);
               getDemoConnectionConstant(rules);
@@ -2702,7 +2825,7 @@
         const previousEntry = state.words.length ? state.words[state.words.length - 1] : null;
         try {
           bounds = readLengthBounds(rules, turnIndex);
-          if (bounds.impossible) return commitFoul(bounds.impossible, memo, comparisonData);
+          if (bounds.impossible) return feedback(`第${turnIndex}ターン目の文字数条件を満たせません：${bounds.impossible}`);
           overlapNow = turnIndex > 1
             ? evaluateRuleFunction(rules.joinLengthFunction, turnIndex, '接続文字数', 0n)
             : 0n;
@@ -2715,10 +2838,10 @@
           return feedback(`長さ・接続の関数式を確認してください：${error.message}`);
         }
         if (bounds.min !== null && currentLength < bounds.min) {
-          return commitFoul(`第${turnIndex}ターン目は正規化後${bounds.min}文字以上が必要です（現在${comparisonData.units.length}文字）。`, memo, comparisonData);
+          return feedback(`文字数条件を満たしていません。第${turnIndex}ターン目は正規化後${bounds.min}文字以上ですが、現在は${comparisonData.units.length}文字です。`);
         }
         if (bounds.max !== null && currentLength > bounds.max) {
-          return commitFoul(`第${turnIndex}ターン目は正規化後${bounds.max}文字以下が必要です（現在${comparisonData.units.length}文字）。`, memo, comparisonData);
+          return feedback(`文字数条件を満たしていません。第${turnIndex}ターン目は正規化後${bounds.max}文字以下ですが、現在は${comparisonData.units.length}文字です。`);
         }
         if (currentLength < overlapNow) {
           return commitFoul(`接続に${overlapNow}文字必要ですが、入力文字列は${comparisonData.units.length}文字です。`, memo, comparisonData);
@@ -2816,6 +2939,10 @@
       });
 
       $('submitButton').addEventListener('click', submitWord);
+      $('autoInsertConnection').addEventListener('change', () => {
+        state.autoInsertConnection = $('autoInsertConnection').checked;
+        syncConnectionInput();
+      });
       $('wordForm').addEventListener('submit', (event) => {
         event.preventDefault();
         submitWord();
