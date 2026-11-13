@@ -39,10 +39,15 @@
     h1 { margin: 9px 0 6px; font-family: "Yu Mincho", "Hiragino Mincho ProN", serif; font-size: clamp(30px, 5vw, 43px); font-weight: 600; letter-spacing: .08em; }
     .subtitle { margin: 0; color: var(--muted); font-size: 14px; }
     .board { overflow: hidden; background: var(--paper); border: 1px solid rgba(95,106,92,.12); border-radius: 24px; box-shadow: var(--shadow); }
-    .players-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 24px 0; background: rgba(247,246,240,.8); }
+    .players-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 24px 0; background: rgba(247,246,240,.8); }
     .players-toolbar label { display: flex; align-items: center; gap: 9px; color: #5d6d60; font-size: 12px; font-weight: 800; }
     .players-toolbar select { min-height: 36px; padding: 5px 28px 5px 9px; border: 1px solid #dcded5; border-radius: 9px; background: white; color: var(--ink); }
     .players-toolbar .roster-note { color: var(--muted); font-size: 11px; }
+    .demo-validation-option { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 9px; }
+    .demo-validation-option[hidden] { display: none; }
+    .demo-validation-option label { display: inline-flex; align-items: center; gap: 7px; color: #5d6d60; font-size: 12px; font-weight: 800; cursor: pointer; }
+    .demo-validation-option input { accent-color: var(--green); width: 15px; height: 15px; margin: 0; }
+    .demo-validation-help { color: var(--muted); font-size: 10px; font-weight: 500; }
     .players { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr)); gap: 12px; padding: 14px 24px 18px; background: rgba(247,246,240,.8); border-bottom: 1px solid var(--line); }
     .player { position: relative; min-width: 0; padding: 16px 18px 14px; border: 1px solid var(--line); border-radius: 16px; background: #fffefa; transition: border-color .2s, background .2s, transform .2s; }
     .player.active { border-color: #91ad99; background: var(--green-pale); box-shadow: inset 0 0 0 1px rgba(82,119,100,.12); }
@@ -197,6 +202,13 @@
             <option value="9">9人</option><option value="10">10人</option>
           </select>
         </label>
+        <div class="demo-validation-option" id="demoValidationOption" hidden>
+          <label for="demoRuleValidation">
+            <input id="demoRuleValidation" type="checkbox" checked>
+            <span>ルール違反の確認を行う</span>
+          </label>
+          <span class="demo-validation-help">オフにすると禁止条件の判定を省略します（文字集合・長さ・接続条件の確認は行います）。</span>
+        </div>
         <span class="roster-note" id="rosterNote">反則したプレイヤーは脱落し、残りの人で続行します。</span>
       </div>
       <section class="players" id="playersGrid" aria-label="プレイヤー一覧"></section>
@@ -1394,7 +1406,14 @@
         return '未対応の終了条件';
       }
 
+      function isDemoRuleValidationEnabled() {
+        const checkbox = $('demoRuleValidation');
+        return !checkbox || checkbox.checked;
+      }
+
       function demoCandidateConflict(candidate, rules) {
+        // お手本モードで判定を省略する設定なら、候補探索時の事前照合も行わない。
+        if (isDemoMode() && !isDemoRuleValidationEnabled()) return null;
         const memo = normalizeWord(candidate, rules);
         const data = prepareComparisonData(memo, rules);
         return findConflictingEntry(data, memo, rules);
@@ -2808,6 +2827,8 @@
         $('nRule').disabled = settingsLocked || characterSet === 'latin' || characterSet === 'digits';
         $('reciprocalRule').disabled = settingsLocked || !reciprocalApplicable.has($('endingRule').value);
         $('playerCountSetting').disabled = settingsLocked;
+        $('demoValidationOption').hidden = !isDemoMode();
+        $('demoRuleValidation').disabled = settingsLocked || !isDemoMode();
         $('settingsLock').textContent = settingsLocked
           ? '対局中のため判定設定と参加人数は変更できません。変更する場合は「最初からやり直す」を押してください。'
           : 'ゲーム開始前は判定設定と参加人数を変更できます。';
@@ -3145,14 +3166,17 @@
           return feedback(`接続条件を満たしていません。${reason}入力内容を修正してください。`);
         }
 
-        let conflict;
-        try {
-          conflict = findConflictingEntry(comparisonData, memo, rules);
-        } catch (error) {
-          if (error && error.code === 'GAP_MASK_LIMIT') {
-            return commitFoul('gap比較用データが安全なメモリ上限を超えました。', memo, comparisonData);
+        let conflict = null;
+        const checkRuleViolation = !isDemoMode() || isDemoRuleValidationEnabled();
+        if (checkRuleViolation) {
+          try {
+            conflict = findConflictingEntry(comparisonData, memo, rules);
+          } catch (error) {
+            if (error && error.code === 'GAP_MASK_LIMIT') {
+              return commitFoul('gap比較用データが安全なメモリ上限を超えました。', memo, comparisonData);
+            }
+            throw error;
           }
-          throw error;
         }
         if (conflict) {
           const ruleName = $('endingRule').selectedOptions[0].textContent.replace(/^\d+\. /, '');
@@ -3160,7 +3184,7 @@
           return commitFoul(`先に宣言された「${conflict.memo}」によって「${ruleName}」${reciprocal}に該当しました。`, memo, comparisonData, conflict);
         }
         const finalSound = comparisonData.units[comparisonData.units.length - 1] || '';
-        if (rules.n === 'forbid' && finalSound === 'ん') {
+        if (checkRuleViolation && rules.n === 'forbid' && finalSound === 'ん') {
           return commitFoul('正規化後の文字列が「ん」で終わっています。', memo, comparisonData);
         }
 
@@ -3314,6 +3338,12 @@
         if (state.history.length) return;
         configurePlayerCount($('playerCountSetting').value);
         feedback(isDemoMode() ? 'お手本モードを選択しました。' : `${state.playerNames.length}人で対局します。`);
+      });
+      $('demoRuleValidation').addEventListener('change', () => {
+        render();
+        feedback($('demoRuleValidation').checked
+          ? 'お手本モードでルール違反の確認を行います。'
+          : 'お手本モードで禁止条件の判定を省略します。');
       });
       $('customAlphabet').addEventListener('input', () => describeRules());
       ['minLengthFunction', 'maxLengthFunction', 'joinLengthFunction'].forEach(id => {
