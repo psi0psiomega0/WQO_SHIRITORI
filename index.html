@@ -92,6 +92,8 @@
     .demo-button:hover { background: var(--green-dark); }
     .demo-button:disabled, .demo-step-input:disabled { opacity: .45; cursor: not-allowed; }
     .demo-status { flex: 1 0 100%; margin: 0; color: var(--muted); text-align: center; font-size: 11px; }
+    .demo-step-warning { flex: 1 0 100%; margin: 0; color: #98622f; text-align: center; font-size: 11px; line-height: 1.6; }
+    .demo-step-warning[hidden] { display: none !important; }
     .warning-overlay { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 20px; background: rgba(31, 39, 32, .56); }
     .warning-overlay[hidden] { display: none !important; }
     .warning-dialog { width: min(480px, 100%); padding: 26px; border: 1px solid #e6c4a1; border-radius: 20px; background: #fffefa; box-shadow: 0 22px 70px rgba(0,0,0,.22); text-align: center; }
@@ -339,12 +341,13 @@
           <button class="start-button" id="startGameButton" type="button">ゲーム開始</button>
         </div>
         <div class="demo-controls" id="demoControls" hidden>
-          <p class="demo-note">同一文字列・前置部分文字列・後置部分文字列・部分文字列・部分列禁止・冪等部分列禁止などのお手本プレイです。1回に進められるのは最大1000手です。</p>
+          <p class="demo-note">各お手本アルゴリズムに従って悪列を生成します。一度に進める手数に固定上限はありません。</p>
           <button class="demo-button" id="demoNextButton" type="button">次の1手を見る</button>
           <label class="demo-step-label" for="demoStepCount">続きを見る手数
-            <input class="demo-step-input" id="demoStepCount" type="number" min="1" max="1000" step="1" value="10">
+            <input class="demo-step-input" id="demoStepCount" type="number" min="1" step="1" value="10">
           </label>
           <button class="demo-button" id="demoBatchButton" type="button">指定手数だけ進める</button>
+          <p class="demo-step-warning" id="demoStepWarning" hidden aria-live="polite">1000手を超える指定では、列の生成・表示に時間がかかることがあります。</p>
           <p class="demo-status" id="demoStatus" aria-live="polite">開始後に、お手本の続きを再生できます。</p>
         </div>
         <div class="turn-panel" aria-live="polite">
@@ -1332,7 +1335,7 @@
       function isDemoMode() { return $('playerCountSetting').value === '0'; }
       function isSoloMode() { return $('playerCountSetting').value === '1'; }
 
-      const MAX_DEMO_STEPS_PER_RUN = 1000;
+      const DEMO_LONG_RUN_WARNING_THRESHOLD = 1000;
       const MAX_DEMO_WORD_UNITS = 1000000;
 
       function getDemoAlphabet(rules) {
@@ -2284,7 +2287,11 @@
 
       function runDemoSteps(requestedSteps) {
         if (!isDemoMode() || !state.started || state.finished) return;
-        const steps = Math.max(1, Math.min(MAX_DEMO_STEPS_PER_RUN, Math.floor(Number(requestedSteps) || 1)));
+        const steps = Number(requestedSteps);
+        if (!Number.isSafeInteger(steps) || steps < 1) {
+          feedback('進める手数は1以上の整数で指定してください。');
+          return;
+        }
         const rules = currentRules();
         let alphabet;
         let c;
@@ -2540,6 +2547,7 @@
             ? '1人プレイ：自分がルール違反をするまで悪列を伸ばします。'
             : `${activePlayerIndexes().length}人参加中 · 反則した人は脱落し、残りの人で続行します。`;
         $('demoControls').hidden = !isDemoMode() || !state.started || state.finished;
+        updateDemoStepWarning();
         $('wordForm').hidden = isDemoMode();
         $('connectionToggleWrap').hidden = isDemoMode();
         $('autoInsertConnection').checked = state.autoInsertConnection;
@@ -2731,7 +2739,10 @@
         if (state.started) return;
         if (!validateGameSettings()) return;
         const rules = currentRules();
-        if (nonWqoEndings.has(rules.ending)) {
+        const hasFiniteConstantUpperBound = Boolean(
+          rules.maxLengthFunction && rules.maxLengthFunction.trim() && isConstantExpression(rules.maxLengthFunction)
+        );
+        if (nonWqoEndings.has(rules.ending) && !hasFiniteConstantUpperBound) {
           $('nonWqoWarning').hidden = false;
           $('confirmWarningButton').focus();
           return;
@@ -2844,13 +2855,13 @@
           return feedback(`文字数条件を満たしていません。第${turnIndex}ターン目は正規化後${bounds.max}文字以下ですが、現在は${comparisonData.units.length}文字です。`);
         }
         if (currentLength < overlapNow) {
-          return commitFoul(`接続に${overlapNow}文字必要ですが、入力文字列は${comparisonData.units.length}文字です。`, memo, comparisonData);
+          return feedback(`接続条件を満たしていません。先頭に必要な接続文字数は${overlapNow}文字ですが、入力文字列は${comparisonData.units.length}文字です。入力内容を修正してください。`);
         }
         if (previousEntry && !compareTailPrefix(previousEntry.units, comparisonData.units, overlapNow)) {
           const reason = overlapNow > BigInt(previousEntry.units.length)
             ? `前の有効な文字列は接続に必要な${overlapNow}文字より短いです。`
             : `前の有効な文字列の末尾${overlapNow}文字と先頭${overlapNow}文字が一致しません。`;
-          return commitFoul(reason, memo, comparisonData);
+          return feedback(`接続条件を満たしていません。${reason}入力内容を修正してください。`);
         }
 
         let conflict;
@@ -2926,14 +2937,20 @@
       $('nonWqoWarning').addEventListener('click', (event) => { if (event.target === $('nonWqoWarning')) $('cancelWarningButton').click(); });
 
       $('demoNextButton').addEventListener('click', () => runDemoSteps(1));
+      function updateDemoStepWarning() {
+        const count = Number($('demoStepCount').value);
+        $('demoStepWarning').hidden = !Number.isSafeInteger(count) || count <= DEMO_LONG_RUN_WARNING_THRESHOLD;
+      }
       $('demoBatchButton').addEventListener('click', () => {
         const rawCount = Number($('demoStepCount').value);
-        if (!Number.isInteger(rawCount) || rawCount < 1 || rawCount > MAX_DEMO_STEPS_PER_RUN) {
-          feedback('一度に進める手数は1～1000の整数で指定してください。');
+        if (!Number.isSafeInteger(rawCount) || rawCount < 1) {
+          feedback('進める手数は1以上の整数で指定してください。');
           return;
         }
         runDemoSteps(rawCount);
       });
+      $('demoStepCount').addEventListener('input', updateDemoStepWarning);
+      $('demoStepCount').addEventListener('change', updateDemoStepWarning);
       $('demoStepCount').addEventListener('keydown', event => {
         if (event.key === 'Enter') $('demoBatchButton').click();
       });
