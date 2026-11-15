@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f5f1e9">
   <title>ことばをつなごう — 文字列ゲーム</title>
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['\\(', '\\)']] },
+      startup: { typeset: false }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-chtml.js"></script>
   <style>
     :root {
       --ink: #28332e;
@@ -77,6 +84,9 @@
     .rule-select:disabled { opacity: .65; color: #737b73; background: #f4f3ee; }
     .setting-help { min-height: 34px; margin: 0; color: #858c83; font-size: 11px; line-height: 1.55; }
     .setting-help.error { color: var(--red); }
+    .setting-checkbox { display: inline-flex; align-items: center; gap: 8px; width: fit-content; color: #5d6d60; font-size: 12px; font-weight: 750; cursor: pointer; }
+    .setting-checkbox input { width: 15px; height: 15px; margin: 0; accent-color: var(--green); }
+    .setting-checkbox input:disabled { opacity: .6; }
     .function-input { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
     .function-preview { margin-top: 10px; padding: 10px 12px; border-radius: 10px; color: #657468; background: #f4f6f1; font-size: 11px; line-height: 1.6; }
     .function-preview.error { color: var(--red); background: #fff3f1; }
@@ -135,7 +145,10 @@
     .end-panel.show { display: block; }
     .end-title { margin: 0 0 5px; color: #895531; font-size: 18px; font-weight: 800; }
     .end-detail { margin: 0; color: #806f60; font-size: 13px; white-space: pre-line; line-height: 1.8; }
-    .toolbar { display: flex; justify-content: center; gap: 9px; margin-top: 5px; }
+    .toolbar { display: flex; flex-wrap: wrap; justify-content: center; gap: 9px; margin-top: 5px; }
+    .stop-order-type-button { border-color: #d8b49a; color: #96603a; }
+    .stop-order-type-button:hover:not(:disabled) { border-color: #c38b66; background: #fff7f0; }
+    .order-type-stopped-note { margin: 9px 0 0; color: #9a7658; text-align: center; font-size: 11px; }
     .sub-button { padding: 9px 14px; border: 1px solid var(--line); border-radius: 10px; color: #667168; background: transparent; font-size: 12px; cursor: pointer; }
     .sub-button:hover:not(:disabled) { border-color: #aab8ad; background: #f7f8f4; }
     .sub-button:disabled { opacity: .35; cursor: not-allowed; }
@@ -152,6 +165,9 @@
     .history-item .number { color: #a0a69d; font-size: 10px; }
     .history-item .word { color: var(--ink); font-size: 14px; font-weight: 700; }
     .history-item .owner { color: var(--muted); font-size: 10px; }
+    .history-item .remaining { display: inline-flex; align-items: baseline; gap: 4px; color: var(--green-dark); font-size: 11px; white-space: nowrap; }
+    .history-item .remaining-math { display: inline-flex; align-items: baseline; min-height: 1em; font-size: 13px; }
+    .history-item .remaining-math mjx-container { margin: 0 !important; }
     .empty-history { align-self: center; color: #a5aaa2; font-size: 13px; }
     .rules { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 17px; }
     .rule { padding: 14px 15px; border: 1px solid rgba(128,137,125,.14); border-radius: 13px; background: rgba(255,254,250,.64); }
@@ -235,6 +251,14 @@
               <label class="setting-label" for="customAlphabet">使用する文字集合</label>
               <input class="rule-select" id="customAlphabet" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="例：あいう／アイウ／ABC／abc／0123">
               <p class="setting-help" id="customAlphabetHelp">入力した文字を1文字ずつそのまま扱います。変換や結合は行いません。</p>
+            </div>
+            <div class="setting-field" id="remainingOrderField" hidden>
+              <label class="setting-checkbox" for="showRemainingTurns">
+                <input id="showRemainingTurns" type="checkbox">
+                <span id="showRemainingTurnsLabel">残りのターン数・極大順序型を表示する</span>
+              </label>
+              <p class="setting-help" id="showRemainingTurnsHelp">末尾文字一致禁止では残りターン数、使用文字包含禁止では残りの極大順序型、可換部分列禁止ではその上界を表示します。</p>
+              <p class="setting-help" id="orderTypeDisclaimer" hidden>厳密値である保証がないものは、表示しなかったり上限や下限で表示します。WQOであれば実際の極大順序型はターンごとに減少しますが、精密に求まらない場合は表示する順序型の下限や上限が減少しない場合もあります。</p>
             </div>
           </div>
         </section>
@@ -393,7 +417,9 @@
         <div class="toolbar">
           <button class="sub-button" id="undoButton" type="button" disabled>↶ ひとつ戻す</button>
           <button class="sub-button" id="resetButton" type="button">最初からやり直す</button>
+          <button class="sub-button stop-order-type-button" id="stopAlphabetOrderTypeButton" type="button" hidden>順序型の計算をやめる</button>
         </div>
+        <p class="order-type-stopped-note" id="orderTypeCalculationStoppedNote" hidden>順序型の計算は停止しました。このゲーム中は再開できません。</p>
       </section>
 
       <section class="history-section">
@@ -440,6 +466,12 @@
         eliminationOrder: [],
         fastLookup: new Map(),
         gapMaskBytes: 0,
+        // 使用文字包含禁止・可換部分列禁止の順序型計算で使用する。
+        alphabetFamily: [],
+        alphabetOrderContext: null,
+        commutativeFamily: [],
+        commutativeOrderContext: null,
+        orderTypeCalculationStopped: false,
         started: false,
         finished: false,
         demoBatchRunning: false,
@@ -481,7 +513,7 @@
           String.fromCharCode(ch.charCodeAt(0) - 0x60)
         );
       }
-      const settingIds = ['characterSet', 'customAlphabet', 'longRule', 'dakutenRule', 'smallRule', 'tsuRule', 'nRule', 'endingRule', 'reciprocalRule', 'minLengthFunction', 'maxLengthFunction', 'joinLengthFunction'];
+      const settingIds = ['characterSet', 'customAlphabet', 'showRemainingTurns', 'longRule', 'dakutenRule', 'smallRule', 'tsuRule', 'nRule', 'endingRule', 'reciprocalRule', 'minLengthFunction', 'maxLengthFunction', 'joinLengthFunction'];
       const kanaOnlySettingIds = ['longRule', 'dakutenRule', 'smallRule', 'tsuRule'];
       const smallOtherKana = new Set(Object.keys(smallToLarge));
 
@@ -540,6 +572,7 @@
         return {
           characterSet: $('characterSet').value,
           customAlphabet: $('customAlphabet').value,
+          showRemainingTurns: $('showRemainingTurns').checked,
           long: $('longRule').value,
           dakuten: $('dakutenRule').value,
           small: $('smallRule').value,
@@ -1069,6 +1102,397 @@
         for (const unit of aSet) if (!bSet.has(unit)) return false;
         return true;
       }
+      // 使用文字集合の包含禁止で残りの極大順序型を数えるための処理。
+      // checkboxがOFFなら、コンテキスト作成・集合族の更新・count計算のいずれも呼び出さない。
+      const MAX_ALPHABET_COUNT_MEMO_ENTRIES = 20000;
+
+      function bitCountBigInt(value) {
+        let count = 0;
+        while (value) {
+          value &= value - 1n;
+          count++;
+        }
+        return count;
+      }
+
+      function normalizeForbiddenMasks(masks) {
+        const unique = [...new Set(masks)];
+        if (unique.some(mask => mask === 0n)) return [0n];
+        unique.sort((a, b) => {
+          const sizeDifference = bitCountBigInt(a) - bitCountBigInt(b);
+          if (sizeDifference) return sizeDifference;
+          return a < b ? -1 : a > b ? 1 : 0;
+        });
+        const minimal = [];
+        for (const candidate of unique) {
+          // 小さい集合から処理しているので、既に残っているものが候補の部分集合なら候補は冗長。
+          if (minimal.some(existing => (existing & candidate) === existing)) continue;
+          minimal.push(candidate);
+        }
+        return minimal;
+      }
+
+      // 順序型計算に使う有限文字集合。ひらがなは清音の基本文字だけに限定し、
+      // 小書き文字・伸ばし棒・濁点／半濁点付き文字を座標に含めない。
+      function getOrderTypeAlphabetSpec(rules) {
+        if (rules.characterSet === 'hiragana') {
+          return { valid: true, kind: 'hiragana', order: HIRAGANA_ORDER, chars: HIRAGANA_ORDER.slice() };
+        }
+        if (rules.characterSet === 'latin') {
+          return { valid: true, kind: 'uppercase', order: UPPER_ORDER, chars: UPPER_ORDER.slice() };
+        }
+        if (rules.characterSet === 'digits') {
+          return { valid: true, kind: 'digits', order: DIGIT_ORDER, chars: DIGIT_ORDER.slice() };
+        }
+        return classifyCustomAlphabet(rules.customAlphabet);
+      }
+
+      function createAlphabetOrderContext(alphabetSpec) {
+        const baseRank = new Map(alphabetSpec.order.map((unit, index) => [unit, index]));
+        const characters = alphabetSpec.chars.slice().sort((a, b) => baseRank.get(a) - baseRank.get(b));
+        const indexMap = new Map(characters.map((unit, index) => [unit, index]));
+        const fullMask = (1n << BigInt(characters.length)) - 1n;
+        return {
+          characters,
+          indexMap,
+          fullMask,
+          memo: new Map()
+        };
+      }
+
+      function createCommutativeOrderContext(alphabetSpec) {
+        const baseRank = new Map(alphabetSpec.order.map((unit, index) => [unit, index]));
+        const characters = alphabetSpec.chars.slice().sort((a, b) => baseRank.get(a) - baseRank.get(b));
+        return {
+          characters,
+          indexMap: new Map(characters.map((unit, index) => [unit, index])),
+          memo: new Map()
+        };
+      }
+
+      const MAX_COMMUTATIVE_ORDER_MEMO_ENTRIES = 50000;
+
+      function naturalVectorLeq(left, right) {
+        for (let i = 0; i < left.length; i++) if (left[i] > right[i]) return false;
+        return true;
+      }
+
+      function compareNaturalVectors(left, right) {
+        for (let i = 0; i < left.length; i++) {
+          if (left[i] < right[i]) return -1;
+          if (left[i] > right[i]) return 1;
+        }
+        return 0;
+      }
+
+      function naturalVectorSum(vector) {
+        return vector.reduce((sum, value) => sum + value, 0n);
+      }
+
+      function normalizeCommutativeVectors(vectors) {
+        const unique = new Map();
+        for (const vector of vectors) unique.set(vector.join(','), vector);
+        const sorted = [...unique.values()].sort((a, b) => {
+          const sumA = naturalVectorSum(a);
+          const sumB = naturalVectorSum(b);
+          if (sumA < sumB) return -1;
+          if (sumA > sumB) return 1;
+          return compareNaturalVectors(a, b);
+        });
+        const minimal = [];
+        for (const candidate of sorted) {
+          if (minimal.some(existing => naturalVectorLeq(existing, candidate))) continue;
+          minimal.push(candidate);
+        }
+        return minimal.sort(compareNaturalVectors);
+      }
+
+      function addCommutativeVectorToFamily(entry, context) {
+        const vector = context.characters.map(unit => BigInt(entry.unitCounts.get(unit) || 0));
+        const current = state.commutativeFamily;
+
+        // 既存ベクトルが新しいベクトル以下なら、新しい禁止条件は冗長。
+        if (current.some(existing => naturalVectorLeq(existing.vector, vector))) {
+          entry.commutativeFamilyChange = null;
+          entry.commutativeOrderUpperBound = computeCommutativeOrderUpperBound(
+            current.map(item => item.vector), context.characters.length, context.memo
+          );
+          return;
+        }
+
+        // 新しいベクトルが既存ベクトル以下なら、既存の大きいベクトルを取り除く。
+        const removed = current.filter(existing => naturalVectorLeq(vector, existing.vector));
+        const survivors = current.filter(existing => !naturalVectorLeq(vector, existing.vector));
+        const added = { vector };
+        state.commutativeFamily = [...survivors, added].sort((a, b) => compareNaturalVectors(a.vector, b.vector));
+        entry.commutativeFamilyChange = { added, removed };
+        entry.commutativeVector = vector;
+        entry.commutativeOrderUpperBound = computeCommutativeOrderUpperBound(
+          state.commutativeFamily.map(item => item.vector), context.characters.length, context.memo
+        );
+      }
+
+      function undoCommutativeVectorFromFamily(entry) {
+        if (!entry || !entry.commutativeFamilyChange) return;
+        const { added, removed } = entry.commutativeFamilyChange;
+        let family = state.commutativeFamily;
+        if (added) family = family.filter(item => item !== added);
+        family = family.concat(removed);
+        state.commutativeFamily = family.sort((a, b) => compareNaturalVectors(a.vector, b.vector));
+      }
+
+      // 禁止ベクトルの反鎖Aから、下方閉集合の最大順序型の上界を
+      // [ω^(k-1), ..., ω, 1] の係数ベクトルとして計算する。
+      // 全ての加算は順序数の自然和に対応する成分ごとの加算。
+      function computeCommutativeOrderUpperBound(rawFamily, dimension, memo) {
+        const family = normalizeCommutativeVectors(rawFamily);
+        if (!family.length) throw new Error('可換部分列の禁止ベクトル族が空です。');
+        if (dimension === 1) {
+          // N上の反鎖は1元集合。唯一の元の値が有限順序型となる。
+          return [family[0][0]];
+        }
+
+        const key = `${dimension}|${family.map(vector => vector.join(',')).join(';')}`;
+        if (memo.has(key)) return memo.get(key).slice();
+
+        const minima = Array.from({ length: dimension }, (_, coordinate) =>
+          family.reduce((minimum, vector) => vector[coordinate] < minimum ? vector[coordinate] : minimum, family[0][coordinate])
+        );
+        const safeHyperplaneCount = minima.reduce((sum, value) => sum + value, 0n);
+        const shifted = family.map(vector => vector.map((value, index) => value - minima[index]));
+
+        // 各座標方向について、禁止条件が切り替わる異なる値の個数を数える。
+        // 実際の再帰回数は最大値そのものではなく、この個数で決まるため、
+        // 異なる値が最少の座標を先頭に選ぶ。同数なら最大値が小さい方を優先する。
+        const coordinateChoices = Array.from({ length: dimension }, (_, coordinate) => {
+          const values = [...new Set(shifted.map(vector => vector[coordinate].toString()))]
+            .map(value => BigInt(value))
+            .sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
+          return { coordinate, values, distinctCount: values.length, maximum: values[values.length - 1] };
+        }).sort((left, right) =>
+          left.distinctCount - right.distinctCount
+          || (left.maximum < right.maximum ? -1 : left.maximum > right.maximum ? 1 : 0)
+          || left.coordinate - right.coordinate
+        );
+        const pivotCoordinate = coordinateChoices[0].coordinate;
+        const firstValues = coordinateChoices[0].values;
+        const remainingCoordinates = Array.from({ length: dimension }, (_, index) => index)
+          .filter(index => index !== pivotCoordinate);
+        const pivotShifted = shifted.map(vector => [
+          vector[pivotCoordinate],
+          ...remainingCoordinates.map(index => vector[index])
+        ]);
+        if (firstValues[0] !== 0n) throw new Error('座標の最小値の正規化に失敗しました。');
+
+        // 係数の並びは [ω^(k-1), ω^(k-2), ..., 1]。
+        const result = Array(dimension).fill(0n);
+
+        // p=0,...,maxFirst-1 の断面を、禁止条件が変わる区間ごとにまとめる。
+        // firstValues[i] <= p < firstValues[i+1] では A_p が一定。
+        for (let i = 0; i + 1 < firstValues.length; i++) {
+          const threshold = firstValues[i];
+          const multiplicity = firstValues[i + 1] - threshold;
+          if (multiplicity === 0n) continue;
+          const section = normalizeCommutativeVectors(
+            pivotShifted.filter(vector => vector[0] <= threshold).map(vector => vector.slice(1))
+          );
+          const sectionBound = computeCommutativeOrderUpperBound(section, dimension - 1, memo);
+          for (let j = 0; j < sectionBound.length; j++) {
+            result[j + 1] += sectionBound[j] * multiplicity;
+          }
+        }
+
+        // 第一成分の禁止条件が変化しない無限部分を、Nとの直積として処理する。
+        const stableSection = normalizeCommutativeVectors(pivotShifted.map(vector => vector.slice(1)));
+        const stableBound = computeCommutativeOrderUpperBound(stableSection, dimension - 1, memo);
+        // ωとの自然積は係数の次数を1つ上げる（右端に定数項0を追加する）。
+        for (let j = 0; j < stableBound.length; j++) result[j] += stableBound[j];
+
+        // ②で切り出した安全な超平面の上界を最高次係数に加える。
+        result[0] += safeHyperplaneCount;
+
+        if (memo.size < MAX_COMMUTATIVE_ORDER_MEMO_ENTRIES) memo.set(key, result.slice());
+        return result;
+      }
+
+      function formatOrdinalExpression(coefficients) {
+        const texTerms = [];
+        const plainTerms = [];
+        const dimension = coefficients.length;
+        for (let index = 0; index < dimension; index++) {
+          const coefficient = coefficients[index];
+          if (coefficient === 0n) continue;
+          const degree = dimension - index - 1;
+          let baseTex = '';
+          let basePlain = '';
+          if (degree === 1) {
+            baseTex = '\\omega';
+            basePlain = 'ω';
+          } else if (degree > 1) {
+            baseTex = `\\omega^{${degree}}`;
+            basePlain = `ω^${degree}`;
+          }
+          if (degree === 0) {
+            texTerms.push(coefficient.toString());
+            plainTerms.push(coefficient.toString());
+          } else if (coefficient === 1n) {
+            texTerms.push(baseTex);
+            plainTerms.push(basePlain);
+          } else {
+            texTerms.push(`${baseTex}\\cdot ${coefficient}`);
+            plainTerms.push(`${basePlain}·${coefficient}`);
+          }
+        }
+        return {
+          tex: texTerms.length ? texTerms.join(' + ') : '0',
+          plain: plainTerms.length ? plainTerms.join(' + ') : '0'
+        };
+      }
+
+      // 可換部分列ではω^(k-1), ω^(k-2)の係数が厳密。
+      // それより低い次数の係数が残る場合は、その2項だけを下限として表示する。
+      function formatCommutativeOrderEstimate(coefficients) {
+        const upper = formatOrdinalExpression(coefficients);
+        const lowerCoefficients = coefficients.map((value, index) => index < 2 ? value : 0n);
+        const hasLowerTerms = coefficients.slice(2).some(value => value !== 0n);
+        if (!hasLowerTerms) {
+          return { tex: upper.tex, plain: upper.plain, exact: true };
+        }
+        const lower = formatOrdinalExpression(lowerCoefficients);
+        return {
+          tex: `${lower.tex}\\leq o(D)\\leq ${upper.tex}`,
+          plain: `${lower.plain} ≤ o(D) ≤ ${upper.plain}`,
+          exact: false
+        };
+      }
+
+      function shouldTrackCommutativeOrderBound(rules) {
+        return rules.ending === 'commutative'
+          && rules.showRemainingTurns
+          && !state.orderTypeCalculationStopped;
+      }
+
+      function compareAlphabetFamilyItems(left, right, context) {
+        const length = Math.min(left.units.length, right.units.length);
+        for (let i = 0; i < length; i++) {
+          const difference = context.indexMap.get(left.units[i]) - context.indexMap.get(right.units[i]);
+          if (difference) return difference;
+        }
+        return left.units.length - right.units.length;
+      }
+
+      function sortAlphabetFamily(family, context) {
+        return family.slice().sort((a, b) => compareAlphabetFamilyItems(a, b, context));
+      }
+
+      function addAlphabetSetToFamily(entry, context) {
+        const units = context.characters.filter(unit => entry.alphabetSet.has(unit));
+        let mask = 0n;
+        for (const unit of units) mask |= 1n << BigInt(context.indexMap.get(unit));
+
+        // 既存集合が新しい集合の部分集合なら、新しい集合は既存の禁止条件に含まれる。
+        // 通常モードでは反則になる。お手本の判定省略時なども、極小族は変化させない。
+        if (state.alphabetFamily.some(existing => (existing.mask & mask) === existing.mask)) {
+          entry.alphabetFamilyChange = null;
+          entry.remainingOrderType = countAvoidingForbiddenSubsets(
+            state.alphabetFamily.map(item => item.mask), context.fullMask, context.memo
+          );
+          return;
+        }
+
+        // 新しい集合が既存集合の部分集合なら、既存の大きい集合を取り除いて新しい集合を加える。
+        const removed = state.alphabetFamily.filter(existing => (mask & existing.mask) === mask);
+        const survivors = state.alphabetFamily.filter(existing => (mask & existing.mask) !== mask);
+        const added = { mask, units };
+        state.alphabetFamily = sortAlphabetFamily([...survivors, added], context);
+        entry.alphabetFamilyChange = { added, removed };
+        entry.alphabetMask = mask;
+        entry.remainingOrderType = countAvoidingForbiddenSubsets(
+          state.alphabetFamily.map(item => item.mask), context.fullMask, context.memo
+        );
+      }
+
+      function undoAlphabetSetFromFamily(entry, context) {
+        if (!entry || !entry.alphabetFamilyChange || !context) return;
+        const { added, removed } = entry.alphabetFamilyChange;
+        let family = state.alphabetFamily;
+        if (added) family = family.filter(item => item !== added);
+        family = family.concat(removed);
+        state.alphabetFamily = sortAlphabetFamily(family, context);
+      }
+
+      // Lは包含関係について反鎖、sigmaMaskは現在の文字集合を表すビット集合。
+      // count(L,Σ) = #{X⊆Σ : どのLの元もXの部分集合ではない}。
+      function countAvoidingForbiddenSubsets(rawFamily, sigmaMask, memo) {
+        const family = normalizeForbiddenMasks(rawFamily);
+        const n = bitCountBigInt(sigmaMask);
+        if (family.length === 0) return 1n << BigInt(n);
+        if (family[0] === 0n) return 0n;
+
+        const key = `${sigmaMask.toString(16)}|${family.map(mask => mask.toString(16)).join(',')}`;
+        if (memo.has(key)) return memo.get(key);
+
+        let result;
+        // {a}が禁止集合にあるなら、許されるXはaを含まない。
+        // antichainなので他の禁止集合はaを含まない。{a}自体もLから除く。
+        const singleton = family.find(mask => (mask & (mask - 1n)) === 0n);
+        if (singleton !== undefined) {
+          const reducedSigma = sigmaMask ^ singleton;
+          const reducedFamily = family.filter(mask => mask !== singleton);
+          result = countAvoidingForbiddenSubsets(reducedFamily, reducedSigma, memo);
+        } else {
+          // 現在のΣの各文字について、Lに現れる回数を数える。
+          let maximumFrequency = 0;
+          let selectedIndex = -1;
+          let selectedBit = 0n;
+          // ビット位置の小さい文字を同率時に優先し、列挙順を決定的にする。
+          let bitIndex = 0;
+          let remainingSigma = sigmaMask;
+          while (remainingSigma) {
+            if (remainingSigma & 1n) {
+              const bit = 1n << BigInt(bitIndex);
+              let frequency = 0;
+              for (const mask of family) if (mask & bit) frequency++;
+              if (frequency > maximumFrequency) {
+                maximumFrequency = frequency;
+                selectedIndex = bitIndex;
+                selectedBit = bit;
+              }
+            }
+            remainingSigma >>= 1n;
+            bitIndex++;
+          }
+
+          if (maximumFrequency === 1) {
+            // 最大出現数が1なら、Lの元は互いに素。
+            // 各禁止集合ごとの選択数を掛け合わせ、使われない文字は自由に選べる。
+            let freeCharacters = n;
+            let product = 1n;
+            for (const mask of family) {
+              const size = bitCountBigInt(mask);
+              freeCharacters -= size;
+              product *= (1n << BigInt(size)) - 1n;
+            }
+            result = (1n << BigInt(freeCharacters)) * product;
+          } else {
+            const reducedSigma = sigmaMask ^ selectedBit;
+            const withoutA = family.filter(mask => (mask & selectedBit) === 0n);
+            const withA = family.map(mask => mask & ~selectedBit);
+            const withoutCount = countAvoidingForbiddenSubsets(withoutA, reducedSigma, memo);
+            const withCount = countAvoidingForbiddenSubsets(withA, reducedSigma, memo);
+            result = withoutCount + withCount;
+          }
+        }
+
+        if (memo.size < MAX_ALPHABET_COUNT_MEMO_ENTRIES) memo.set(key, result);
+        return result;
+      }
+
+      function shouldTrackAlphabetOrderType(rules) {
+        return rules.ending === 'alphabet'
+          && rules.showRemainingTurns
+          && !state.orderTypeCalculationStopped;
+      }
       // 各単語の比較用データは登録時に一度だけ作る。設定は対局中固定される。
       function prepareComparisonData(memo, rules, gapInfo = null) {
         // かなモードだけ小文字の結合設定を反映する。それ以外はコードポイント単位で厳密に比較する。
@@ -1299,7 +1723,48 @@
                 : 'アルファベット順';
           gapHelp.textContent = `文字の順序は${orderName}です。ひらがなモードでは、正規化後に濁点・半濁点付き文字、小さい文字、伸ばし棒が残る入力は使用できません。`;
         }
+        const remainingLabel = $('showRemainingTurnsLabel');
+        const remainingHelp = $('showRemainingTurnsHelp');
+        if (rules.ending === 'last') {
+          remainingLabel.textContent = '残りのターン数を表示する';
+          remainingHelp.textContent = '末尾文字一致禁止で、文字集合の要素数から現在のターン番号を引いた残りターン数を表示します。';
+        } else if (rules.ending === 'alphabet') {
+          remainingLabel.textContent = '残りの極大順序型を表示する';
+          remainingHelp.textContent = '既出の使用文字集合から、残りの極大順序型を計算します。';
+        } else if (rules.ending === 'commutative') {
+          remainingLabel.textContent = '残りの極大順序型の上界を表示する';
+          remainingHelp.textContent = '各文字の出現数ベクトルから上界を計算します。上位2係数は厳密値で、下位の項が残る場合は上下限を表示します。計算には時間がかかる場合があります。';
+        } else {
+          remainingLabel.textContent = '残りのターン数・極大順序型を表示する';
+          remainingHelp.textContent = '末尾文字一致禁止では残りターン数、使用文字包含禁止では残りの極大順序型、可換部分列禁止ではその上界を表示します。';
+        }
+        const orderTypeKanaHelp = rules.characterSet === 'hiragana'
+          && ['alphabet', 'commutative'].includes(rules.ending)
+          ? ' ひらがなの順序型計算では清音の基本文字のみを使い、小書き文字・伸ばし棒・濁点／半濁点付き文字は文字集合に含めません。正規化後にこれらが残る入力は使用できません。'
+          : '';
+        if (['alphabet', 'commutative'].includes(rules.ending)) remainingHelp.textContent += orderTypeKanaHelp;
+        $('remainingOrderField').hidden = !['last', 'alphabet', 'commutative'].includes(rules.ending);
+        $('orderTypeDisclaimer').hidden = !['alphabet', 'commutative'].includes(rules.ending);
         describeConstraintFunctions();
+      }
+
+      function renderRemainingTurnsMath(target, formula, description = '残り', fallbackText = null) {
+        if (!target) return;
+        // 各ターンで計算済みの値・順序数上界を数式として描画する。
+        const value = String(formula);
+        target.textContent = fallbackText === null ? value : fallbackText;
+        target.setAttribute('aria-label', `${description}${fallbackText === null ? value : fallbackText}`);
+        const mathJax = window.MathJax;
+        if (!mathJax || typeof mathJax.tex2chtmlPromise !== 'function') return;
+        const ready = mathJax.startup && mathJax.startup.promise
+          ? mathJax.startup.promise
+          : Promise.resolve();
+        ready
+          .then(() => mathJax.tex2chtmlPromise(value))
+          .then(rendered => {
+            if (target.isConnected) target.replaceChildren(rendered);
+          })
+          .catch(() => { /* Keep the plain-text fallback if typesetting fails. */ });
       }
 
       function showEmptyHistory() {
@@ -1326,8 +1791,46 @@
         const owner = document.createElement('span');
         owner.className = 'owner';
         owner.textContent = entry.foul ? `${nameOf(entry.player)} · 反則：${entry.foulReason}` : nameOf(entry.player);
-        item.append(number, word, owner);
+
+        const rules = currentRules();
+        let remaining = null;
+        let remainingFormula = null;
+        let remainingFallback = null;
+        let remainingDescription = '残り';
+        if (!entry.foul && rules.showRemainingTurns) {
+          if (rules.ending === 'last') {
+            const alphabetSpec = getOrderTypeAlphabetSpec(rules);
+            if (alphabetSpec.valid) remainingFormula = BigInt(alphabetSpec.chars.length - entry.turnIndex);
+          } else if (rules.ending === 'alphabet'
+              && typeof entry.remainingOrderType === 'bigint') {
+            remainingFormula = entry.remainingOrderType;
+            remainingDescription = '残りの極大順序型';
+          } else if (rules.ending === 'commutative'
+              && Array.isArray(entry.commutativeOrderUpperBound)) {
+            const formatted = formatCommutativeOrderEstimate(entry.commutativeOrderUpperBound);
+            remainingFormula = formatted.tex;
+            remainingFallback = formatted.plain;
+            remainingDescription = formatted.exact ? '残りの極大順序型' : '残りの極大順序型の上下限';
+          }
+          if (remainingFormula !== null) {
+            remaining = document.createElement('span');
+            remaining.className = 'remaining';
+            const label = document.createElement('span');
+            label.textContent = rules.ending === 'last' ? ': 残り' : `: ${remainingDescription}`;
+            const formula = document.createElement('span');
+            formula.className = 'remaining-math';
+            formula.textContent = remainingFallback === null ? String(remainingFormula) : remainingFallback;
+            formula.setAttribute('aria-label', `${remainingDescription}${remainingFallback === null ? remainingFormula : remainingFallback}`);
+            remaining.append(label, formula);
+          }
+        }
+        item.append(number, word);
+        if (remaining) item.append(remaining);
+        item.append(owner);
         list.append(item);
+        if (remaining) renderRemainingTurnsMath(
+          remaining.querySelector('.remaining-math'), remainingFormula, remainingDescription, remainingFallback
+        );
       }
       function removeLastHistoryEntry() {
         const list = $('historyList');
@@ -1876,7 +2379,11 @@
         const current = sequence[turnIndex - 1];
         const next = sequence[turnIndex];
         const bounds = readAlphabetDemoBounds(rules, turnIndex);
-        const middle = current.set.filter(ch => ch !== current.first);
+        // 接続文字数が正なら最小文字は左右の接続部分に置くため中央部から除く。
+        // 接続文字数が0なら両端の固定部分がないので、最小文字も中央部に含める。
+        const middle = connection === 0
+          ? current.set.slice()
+          : current.set.filter(ch => ch !== current.first);
         const requiredLength = 2 * connection + middle.length;
         let targetLength = BigInt(Math.max(1, requiredLength));
 
@@ -2824,6 +3331,9 @@
           const customOnly = id === 'customAlphabet';
           $(id).disabled = settingsLocked || (kanaOnly && characterSet !== 'hiragana') || (customOnly && characterSet !== 'custom');
         });
+        const remainingRule = $('endingRule').value;
+        const remainingCounterApplicable = ['last', 'alphabet', 'commutative'].includes(remainingRule);
+        $('showRemainingTurns').disabled = settingsLocked || !remainingCounterApplicable;
         $('nRule').disabled = settingsLocked || characterSet === 'latin' || characterSet === 'digits';
         $('reciprocalRule').disabled = settingsLocked || !reciprocalApplicable.has($('endingRule').value);
         $('playerCountSetting').disabled = settingsLocked;
@@ -2957,6 +3467,11 @@
           $('wordInput').placeholder = previous ? (previous.nextJoinCount ? `「${previous.next}」から始まる文字列` : '接続制限なしで入力') : '文字列を入力';
         }
         $('undoButton').disabled = state.history.length === 0;
+        const orderTypeCalculationConfigured = state.started
+          && ['alphabet', 'commutative'].includes(remainingRule)
+          && $('showRemainingTurns').checked;
+        $('stopAlphabetOrderTypeButton').hidden = !orderTypeCalculationConfigured || state.orderTypeCalculationStopped;
+        $('orderTypeCalculationStoppedNote').hidden = !orderTypeCalculationConfigured || !state.orderTypeCalculationStopped;
         syncConnectionInput();
         const foulCount = state.history.filter(entry => entry.foul).length;
         $('historyCount').textContent = `${state.words.length} 有効ターン · ${foulCount} 反則`;
@@ -3029,6 +3544,23 @@
         return true;
       }
       function startGameNow() {
+        state.alphabetFamily = [];
+        state.alphabetOrderContext = null;
+        state.commutativeFamily = [];
+        state.commutativeOrderContext = null;
+        state.orderTypeCalculationStopped = false;
+        const startRules = currentRules();
+        const trackAlphabetOrder = shouldTrackAlphabetOrderType(startRules);
+        const trackCommutativeOrder = shouldTrackCommutativeOrderBound(startRules);
+        if (trackAlphabetOrder || trackCommutativeOrder) {
+          const orderTypeAlphabet = getOrderTypeAlphabetSpec(startRules);
+          if (trackAlphabetOrder && orderTypeAlphabet.valid) {
+            state.alphabetOrderContext = createAlphabetOrderContext(orderTypeAlphabet);
+          }
+          if (trackCommutativeOrder && orderTypeAlphabet.valid) {
+            state.commutativeOrderContext = createCommutativeOrderContext(orderTypeAlphabet);
+          }
+        }
         state.started = true;
         state.turn = 0;
         $('nonWqoWarning').hidden = true;
@@ -3103,20 +3635,20 @@
           display = raw.trim().replace(/\s+/g, '');
           source = toHiragana(display);
           if (!/^[\u3041-\u3096ー]+$/.test(source)) {
-            return commitFoul('ひらがな・カタカナ以外の文字が入力されました。', display);
+            return feedback('ひらがな・カタカナ以外の文字が入力されました。入力内容を修正してください。');
           }
           if (source.startsWith('ー')) {
             return commitFoul('文字列の先頭に伸ばし棒「ー」は使えません。', source);
           }
         } else if (rules.characterSet === 'latin') {
-          if (!/^[A-Za-z]+$/.test(raw)) return commitFoul('ラテンアルファベット以外の文字が入力されました。', raw);
+          if (!/^[A-Za-z]+$/.test(raw)) return feedback('ラテンアルファベット以外の文字が入力されました。入力内容を修正してください。');
         } else if (rules.characterSet === 'digits') {
-          if (!/^[0-9]+$/.test(raw)) return commitFoul('半角数字以外の文字が入力されました。', raw);
+          if (!/^[0-9]+$/.test(raw)) return feedback('半角数字以外の文字が入力されました。入力内容を修正してください。');
         } else {
           const allowedChars = customSpec.chars;
           const allowed = new Set(allowedChars);
           const invalidChar = Array.from(raw).find(ch => !allowed.has(ch));
-          if (invalidChar !== undefined) return commitFoul(`「${invalidChar}」は設定した文字集合に含まれていません。`, raw);
+          if (invalidChar !== undefined) return feedback(`「${invalidChar}」は設定した文字集合に含まれていません。入力内容を修正してください。`);
           source = raw;
           display = raw;
         }
@@ -3128,10 +3660,24 @@
         if (gapInfo && rules.characterSet === 'hiragana') {
           const unsupported = Array.from(memo).find(ch => !gapInfo.rankMap.has(ch));
           if (unsupported !== undefined) {
-            return commitFoul(`gap部分列モードで使用できない文字「${unsupported}」が正規化後に残っています。`, memo);
+            return feedback(`gap部分列モードで使用できない文字「${unsupported}」が正規化後に残っています。入力内容を修正してください。`);
           }
         }
         comparisonData = prepareComparisonData(memo, rules, gapInfo);
+        if (rules.showRemainingTurns
+            && (rules.ending === 'last' || !state.orderTypeCalculationStopped)
+            && ['last', 'alphabet', 'commutative'].includes(rules.ending)) {
+          const alphabetSpec = getOrderTypeAlphabetSpec(rules);
+          if (alphabetSpec.valid) {
+            const allowedUnits = new Set(alphabetSpec.chars);
+            const unsupportedUnit = comparisonData.units.find(unit => !allowedUnits.has(unit));
+            if (unsupportedUnit !== undefined) {
+              return feedback(
+                `順序型・残りターン数の計算で使用できる文字集合に含まれない文字「${unsupportedUnit}」が正規化後に残っています。入力内容を修正してください。`
+              );
+            }
+          }
+        }
         const currentLength = BigInt(comparisonData.units.length);
         let bounds;
         let overlapNow;
@@ -3217,6 +3763,12 @@
           entry.indexKey = finalSound;
           state.fastLookup.set(finalSound, entry);
         }
+        if (shouldTrackAlphabetOrderType(rules) && state.alphabetOrderContext && entry.alphabetSet) {
+          addAlphabetSetToFamily(entry, state.alphabetOrderContext);
+        }
+        if (shouldTrackCommutativeOrderBound(rules) && state.commutativeOrderContext && entry.unitCounts) {
+          addCommutativeVectorToFamily(entry, state.commutativeOrderContext);
+        }
         state.words.push(entry);
         state.history.push(entry);
         state.playerCounts[player]++;
@@ -3270,6 +3822,29 @@
         submitWord();
       });
 
+      $('stopAlphabetOrderTypeButton').addEventListener('click', () => {
+        const rules = currentRules();
+        if (!state.started || state.orderTypeCalculationStopped
+            || !['alphabet', 'commutative'].includes(rules.ending)
+            || !rules.showRemainingTurns) return;
+        if (!window.confirm('再度計算し直すことはできません。本当によろしいですか？')) return;
+
+        // 既に表示した値は履歴に残し、以後のターンでは集合族の更新・計算を一切行わない。
+        state.orderTypeCalculationStopped = true;
+        for (const entry of state.words) {
+          entry.alphabetFamilyChange = null;
+          entry.commutativeFamilyChange = null;
+          delete entry.alphabetMask;
+          delete entry.commutativeVector;
+        }
+        state.alphabetFamily = [];
+        state.alphabetOrderContext = null;
+        state.commutativeFamily = [];
+        state.commutativeOrderContext = null;
+        render();
+        feedback('順序型の計算を停止しました。これ以降は計算しません。', 'success');
+      });
+
       $('undoButton').addEventListener('click', () => {
         if (!state.history.length) return;
         const removed = state.history.pop();
@@ -3283,6 +3858,12 @@
           releaseEntryCache(removed);
         } else {
           const validRemoved = state.words.pop();
+          if (validRemoved && validRemoved.alphabetFamilyChange && state.alphabetOrderContext) {
+            undoAlphabetSetFromFamily(validRemoved, state.alphabetOrderContext);
+          }
+          if (validRemoved && validRemoved.commutativeFamilyChange && state.commutativeOrderContext) {
+            undoCommutativeVectorFromFamily(validRemoved);
+          }
           releaseEntryCache(validRemoved);
           if (validRemoved && validRemoved.indexed && state.fastLookup.get(validRemoved.indexKey) === validRemoved) {
             state.fastLookup.delete(validRemoved.indexKey);
@@ -3316,6 +3897,11 @@
         state.turn = 0;
         state.words = [];
         state.history = [];
+        state.alphabetFamily = [];
+        state.alphabetOrderContext = null;
+        state.commutativeFamily = [];
+        state.commutativeOrderContext = null;
+        state.orderTypeCalculationStopped = false;
         state.demoAlphabetSequence = null;
         state.demoCommutativeSequence = null;
         state.playerCounts = Array(state.playerNames.length).fill(0);
