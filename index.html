@@ -108,6 +108,11 @@
     .demo-button { min-height: 43px; padding: 9px 15px; border: 0; border-radius: 10px; color: white; background: var(--green); font-size: 12px; font-weight: 800; cursor: pointer; }
     .demo-button:hover { background: var(--green-dark); }
     .demo-button:disabled, .demo-step-input:disabled { opacity: .45; cursor: not-allowed; }
+    .demo-transition-panel { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; margin: -4px auto 18px; padding: 12px 14px; border: 1px solid #d9e5f1; border-radius: 14px; background: #f3f7fb; }
+    .demo-transition-panel[hidden] { display: none !important; }
+    .demo-transition-note { margin: 0; color: #53677c; font-size: 11px; line-height: 1.6; }
+    .demo-transition-button { min-height: 40px; padding: 9px 15px; border: 0; border-radius: 10px; color: white; background: #426b91; font-size: 12px; font-weight: 800; cursor: pointer; }
+    .demo-transition-button:hover { background: #315574; }
     .demo-status { flex: 1 0 100%; margin: 0; color: var(--muted); text-align: center; font-size: 11px; }
     .demo-step-warning { flex: 1 0 100%; margin: 0; color: #98622f; text-align: center; font-size: 11px; line-height: 1.6; }
     .demo-step-warning[hidden] { display: none !important; }
@@ -155,9 +160,16 @@
     .sub-button:hover:not(:disabled) { border-color: #aab8ad; background: #f7f8f4; }
     .sub-button:disabled { opacity: .35; cursor: not-allowed; }
     .history-section { border-top: 1px solid var(--line); padding: 22px clamp(18px, 5vw, 54px) 26px; background: #fdfcf8; }
-    .history-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 13px; }
+    .history-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 13px; }
     .history-title { margin: 0; font-size: 14px; font-weight: 800; letter-spacing: .04em; }
+    .history-tools { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 7px; }
     .history-count { color: #9a9f96; font-size: 11px; }
+    .history-tools .sub-button { padding: 7px 10px; font-size: 11px; }
+    .history-save-button { border-color: var(--green); color: white; background: var(--green); font-weight: 750; }
+    .history-save-button:hover:not(:disabled) { border-color: var(--green-dark); background: var(--green-dark); }
+    .history-load-button { border-color: #c77b4e; color: white; background: #c77b4e; font-weight: 750; }
+    .history-load-button:hover:not(:disabled) { border-color: #a9633d; background: #a9633d; }
+    .history-save-note { margin: -5px 0 10px; color: #657468; font-size: 11px; line-height: 1.7; }
     .history-note { margin: -7px 0 12px; color: #92988f; font-size: 11px; }
     .history-item.rule-violation { border-color: #d9a29b; background: #fff3f1; }
     .history-item.rule-violation .word, .history-item.rule-violation .owner { color: var(--red); }
@@ -266,13 +278,13 @@
                   <input id="enableSubsequenceShortening" type="checkbox">
                   <span class="setting-label">計算の短縮</span>
                 </label>
-                <p class="setting-help">精密さを引き換えに、順序型の上界の計算を高速化します。自然数をコンマで区切って「文字の種類-1」個書くと、それをω^{文字の種類-1}未満の順序数とみなし、次数が入力された順序数未満の項を無視して計算します。</p>
+                <p class="setting-help" id="subsequenceShorteningHelp">精密さを引き換えに、順序型の上界の計算を高速化します。自然数をコンマで区切って「文字の種類-1」個書くと、それをω^{文字の種類-1}未満の順序数とみなし、次数が入力された順序数未満の項を無視して計算します。</p>
                 <label class="setting-field" for="subsequenceShorteningThreshold">
-                  <span class="setting-label">次数の下限 α（係数を降順に入力）</span>
+                  <span class="setting-label" id="subsequenceThresholdLabel">次数の下限 α（係数を降順に入力）</span>
                   <input class="rule-select" id="subsequenceShorteningThreshold" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="例：1,0,3">
                 </label>
                 <p class="setting-help subsequence-threshold-preview-label">現在入力されている順序数：<strong id="subsequenceShorteningOrdinalPreview">順序数を入力してください</strong></p>
-                <p class="setting-help">未満の次数の計算を省略します。</p>
+                <p class="setting-help" id="subsequenceThresholdFooter">未満の次数の計算を省略します。</p>
               </div>
             </div>
           </div>
@@ -401,6 +413,10 @@
           <p class="demo-step-warning" id="demoStepWarning" hidden aria-live="polite">1000手を超える指定では、列の生成・表示に時間がかかることがあります。</p>
           <p class="demo-status" id="demoStatus" aria-live="polite">開始後に、お手本の続きを再生できます。</p>
         </div>
+        <div class="demo-transition-panel" id="demoToSoloPanel" hidden>
+          <p class="demo-transition-note">ここまでのお手本の有効な文字列を引き継いで、1人プレイに切り替えます。</p>
+          <button class="demo-transition-button" id="demoToSoloButton" type="button">1人プレイに移行</button>
+        </div>
         <div class="turn-panel" aria-live="polite">
           <div class="turn-caption" id="turnCaption">PLAYER 01 のターン</div>
           <h2 class="turn-title" id="turnTitle">最初のことばをどうぞ</h2>
@@ -440,8 +456,14 @@
       <section class="history-section">
         <div class="history-head">
           <h2 class="history-title">ことばの記録</h2>
-          <span class="history-count" id="historyCount">0 WORDS</span>
+          <div class="history-tools">
+            <span class="history-count" id="historyCount">0 WORDS</span>
+            <button class="sub-button history-save-button" id="downloadGameSaveButton" type="button" disabled>履歴を保存</button>
+            <button class="sub-button history-load-button" id="loadGameSaveButton" type="button">履歴を読み込む</button>
+            <input id="loadGameSaveInput" type="file" accept=".json,application/json" hidden>
+          </div>
         </div>
+        <p class="history-save-note">プレイ人数やルール設定、各手番に宣言された文字列を読み込み、続きからプレイできるようにします。読み込み負荷軽減のため、順序型計算用のデータは引き継ぎません。そのため続きからのプレイでは順序型を計算できません。</p>
         <p class="history-note">有効な手は正規化後の文字列を記録します。反則手は赤字で残しますが、接続・長さ・禁止条件の比較やターン数には含めません。</p>
         <div class="history-list" id="historyList" aria-live="polite">
           <span class="empty-history">まだことばがありません。最初の一語をどうぞ。</span>
@@ -1526,27 +1548,27 @@
       // 部分列禁止の残り言語を、文字集合因子・Kleene閉包因子からなる積和標準形で保持する。
       // 保存する言語には、空集合の処理と、包含関係のある隣接Kleene閉包の統合だけを適用する。
       function shouldTrackSubsequenceOrderType(rules) {
-        return rules.ending === 'subsequence'
+        return ['subsequence', 'idempotent'].includes(rules.ending)
           && rules.showRemainingTurns
           && !state.orderTypeCalculationStopped;
       }
 
-      function createSubsequenceOrderContext(alphabetSpec, pruningThreshold = null) {
+      function createSubsequenceOrderContext(alphabetSpec, pruningThreshold = null, idempotent = false) {
         const baseRank = new Map(alphabetSpec.order.map((unit, index) => [unit, index]));
         const characters = alphabetSpec.chars.slice().sort((a, b) => baseRank.get(a) - baseRank.get(b));
         const indexMap = new Map(characters.map((unit, index) => [unit, index]));
         const fullMask = (1n << BigInt(characters.length)) - 1n;
-        return { characters, indexMap, fullMask, pruningThreshold };
+        return { characters, indexMap, fullMask, pruningThreshold, idempotent };
       }
 
-      // α<ω^(n-1) を、ω^(n-2),...,ω,1 の係数列として読み取る。
-      // n=1の場合は係数が0個なので、空欄だけを0として受け付ける。
-      function parseSubsequencePruningThreshold(value, alphabetSize) {
-        const expectedCount = Math.max(0, alphabetSize - 1);
+      // 部分列ではα<ω^(n-1)、冪等部分列（3種類以上）ではα<ω^(n-2)。
+      // それぞれのCNF係数を降順に読み、最上位係数0を付けたベクトルにする。
+      function parseSubsequencePruningThreshold(value, alphabetSize, idempotent = false) {
+        const expectedCount = Math.max(0, alphabetSize - (idempotent ? 2 : 1));
         const source = String(value ?? '').trim();
         const parts = expectedCount === 0 && source === '' ? [] : source.split(',').map(part => part.trim());
         if (parts.length !== expectedCount) {
-          throw new Error(`次数の係数は、文字の種類-1である${expectedCount}個をコンマ区切りで入力してください。`);
+          throw new Error(`次数の係数は、文字の種類-${idempotent ? 2 : 1}である${expectedCount}個をコンマ区切りで入力してください。`);
         }
         const coefficients = parts.map((part, index) => {
           if (!/^\d+$/.test(part)) {
@@ -1561,22 +1583,29 @@
         const preview = $('subsequenceShorteningOrdinalPreview');
         if (!preview) return;
         const rules = currentRules();
+        const idempotent = rules.ending === 'idempotent';
         const alphabetSpec = getOrderTypeAlphabetSpec(rules);
         if (!alphabetSpec.valid) {
           preview.dataset.mathRenderToken = String((Number(preview.dataset.mathRenderToken) || 0) + 1);
           preview.textContent = '文字集合を確認してください';
           return;
         }
+        if (idempotent && alphabetSpec.chars.length <= 2) {
+          preview.dataset.mathRenderToken = String((Number(preview.dataset.mathRenderToken) || 0) + 1);
+          preview.textContent = '2種類以下では直接計算するため、短縮設定は使用しません';
+          return;
+        }
         try {
           const coefficients = parseSubsequencePruningThreshold(
             rules.subsequenceShorteningThreshold,
-            alphabetSpec.chars.length
+            alphabetSpec.chars.length,
+            idempotent
           );
           const formatted = formatOrdinalExpression(coefficients);
           renderRemainingTurnsMath(preview, `\\alpha = ${formatted.tex}`, '入力順序数', `α = ${formatted.plain}`);
         } catch (error) {
           preview.dataset.mathRenderToken = String((Number(preview.dataset.mathRenderToken) || 0) + 1);
-          const expectedCount = Math.max(0, alphabetSpec.chars.length - 1);
+          const expectedCount = Math.max(0, alphabetSpec.chars.length - (idempotent ? 2 : 1));
           preview.textContent = `${expectedCount}個の自然数を入力してください`;
         }
       }
@@ -1717,13 +1746,29 @@
         return false;
       }
 
+      // 冪等部分列では1元Kleene閉包を有限分岐にするため、次数への寄与は0。
+      // 枝刈り時は未正規化の非単元Kleene閉包を全て数える。後続の簡約で次数が
+      // 下がることはあっても上がらないため、閾値未満と判定した項を捨てるのは安全側。
+      function getIdempotentTermOrderExponent(rawTerm, alphabetSize) {
+        if (rawTerm.some(factor => factor.kind === 'set' && factor.mask === 0n)) return null;
+        const exponent = Array(Math.max(0, alphabetSize - 1)).fill(0n);
+        for (const factor of rawTerm) {
+          if (factor.kind !== 'star') continue;
+          const size = bitCountBigInt(factor.mask);
+          if (size >= 2) exponent[alphabetSize - size] += 1n;
+        }
+        return exponent;
+      }
+
       // 積項の順序型の次数が閾値未満なら捨てる。捨てた部分全体はω^α未満で抑える。
       function pruneSubsequenceLanguage(language, context) {
         if (!context.pruningThreshold) return { language, pruned: false };
         const kept = [];
         let pruned = false;
         for (const term of language) {
-          const exponent = getSubsequenceTermOrderExponent(term, context.characters.length);
+          const exponent = context.idempotent
+            ? getIdempotentTermOrderExponent(term, context.characters.length)
+            : getSubsequenceTermOrderExponent(term, context.characters.length);
           if (exponent && isSubsequenceExponentBelow(exponent, context.pruningThreshold)) {
             pruned = true;
           } else {
@@ -1849,11 +1894,129 @@
         yield* expandAt(0, []);
       }
 
+      // 冪等部分列用の順序型計算専用展開。
+      // ・単元Kleene閉包{a}*は ε+{a} に分配する。
+      // ・通常文字集合も単元集合へ分配する。
+      // ・連続する同一の単元集合{a}{a}は、冪等性により{a}へまとめる。
+      // ・その後、部分列版と共通の隣接Kleene閉包・包含簡約を適用する。
+      // 正規言語そのもの（freeの入力）には適用しない。
+      function* expandIdempotentTermForOrderType(rawFactors) {
+        const exact = normalizeExactSubsequenceTerm(rawFactors);
+        if (exact === null) return;
+
+        function mergeAdjacentEqualSingletonSets(factors) {
+          const result = [];
+          for (const factor of factors) {
+            const previous = result[result.length - 1];
+            if (previous && previous.kind === 'set' && factor.kind === 'set'
+                && previous.mask === factor.mask && bitCountBigInt(factor.mask) === 1) {
+              continue;
+            }
+            result.push(factor);
+          }
+          return result;
+        }
+
+        function* expandAt(index, prefix) {
+          if (index >= exact.length) {
+            const collapsed = mergeAdjacentEqualSingletonSets(prefix);
+            const normalized = normalizeSubsequenceTermForUpperBound(collapsed);
+            if (normalized.length) yield mergeAdjacentEqualSingletonSets(normalized);
+            else yield [];
+            return;
+          }
+          const factor = exact[index];
+          if (factor.kind === 'star') {
+            if (bitCountBigInt(factor.mask) === 1) {
+              // {a}* = ε + {a}
+              yield* expandAt(index + 1, prefix);
+              yield* expandAt(index + 1, prefix.concat({ kind: 'set', mask: factor.mask }));
+            } else {
+              yield* expandAt(index + 1, prefix.concat({ kind: 'star', mask: factor.mask }));
+            }
+            return;
+          }
+          // 通常文字集合を各単元集合に分配する。
+          for (let remaining = factor.mask; remaining !== 0n; remaining &= (remaining - 1n)) {
+            const bit = remaining & -remaining;
+            yield* expandAt(index + 1, prefix.concat({ kind: 'set', mask: bit }));
+          }
+        }
+
+        yield* expandAt(0, []);
+      }
+
+      function computeIdempotentOrderTypeUpperBound(language, alphabetSize, correctionExponent = null) {
+        const grouped = new Map();
+        const seenExpandedTerms = new Set();
+        for (const rawTerm of language) {
+          for (const term of expandIdempotentTermForOrderType(rawTerm)) {
+            const expandedTermKey = term.map(factor => `${factor.kind}:${factor.mask.toString()}`).join('|');
+            if (seenExpandedTerms.has(expandedTermKey)) continue;
+            seenExpandedTerms.add(expandedTermKey);
+
+            // {a}*は展開済み。k元Kleene閉包はω^(k-2)に対応する。
+            const exponent = Array(Math.max(0, alphabetSize - 1)).fill(0n);
+            let emptyProduct = false;
+            for (const factor of term) {
+              const size = bitCountBigInt(factor.mask);
+              if (factor.kind === 'set') {
+                if (size === 0) { emptyProduct = true; break; }
+              } else if (factor.kind === 'star' && size >= 2) {
+                exponent[alphabetSize - size] += 1n;
+              }
+            }
+            if (emptyProduct) continue;
+            const key = exponent.join(',');
+            const current = grouped.get(key);
+            if (current) current.coefficient += 1n;
+            else grouped.set(key, { exponent, coefficient: 1n });
+          }
+        }
+
+        const baseTerms = [...grouped.values()]
+          .map(term => ({ exponent: term.exponent.slice(), coefficient: term.coefficient }))
+          .sort((a, b) => compareOrdinalExponentVectors(a.exponent, b.exponent));
+
+        if (correctionExponent) {
+          const key = correctionExponent.join(',');
+          const current = grouped.get(key);
+          if (current) current.coefficient += 1n;
+          else grouped.set(key, { exponent: correctionExponent.slice(), coefficient: 1n });
+        }
+        const upperTerms = [...grouped.values()]
+          .sort((a, b) => compareOrdinalExponentVectors(a.exponent, b.exponent));
+        const upper = formatSubsequenceOrderTypeTerms(upperTerms);
+        const leadingTerm = baseTerms[0] || null;
+        const lower = leadingTerm
+          ? formatSubsequenceOrderTypeLowerBound(leadingTerm)
+          : { tex: '0', plain: '0' };
+        const exact = !correctionExponent && baseTerms.length <= 1;
+        if (exact) {
+          return {
+            tex: `o(D) = ${upper.tex}`,
+            plain: `o(D) = ${upper.plain}`,
+            exact: true,
+            termCount: seenExpandedTerms.size,
+            correctionApplied: false
+          };
+        }
+        const upperRelationTex = correctionExponent ? '<' : '\\leq';
+        const upperRelationPlain = correctionExponent ? '<' : '≤';
+        return {
+          tex: `${lower.tex}\\leq o(D)${upperRelationTex} ${upper.tex}`,
+          plain: `${lower.plain} ≤ o(D) ${upperRelationPlain} ${upper.plain}`,
+          exact: false,
+          termCount: seenExpandedTerms.size,
+          correctionApplied: Boolean(correctionExponent)
+        };
+      }
+
       // 積項の上界ω^α·cを求め、和の上界を自然和でまとめる。
       // 通常文字集合を単元集合に分配した後、因子列が完全一致する積項だけを一度数える。
-      // 最高次項の次数・係数は正確なので、それを下限としても表示する。
+      // 最高次の係数が正確とは限らないため、下限には最高次のωの冪だけを表示する。
       // 計算短縮時は枝刈り後の言語が元の言語の部分言語であるため、
-      // 枝刈り後の計算結果の最高次項を元の言語の下限として使える。
+      // 枝刈り後の計算結果から得られる下限を元の言語にも適用する。
       function formatSubsequenceOrderTypeTerm(term) {
         const alpha = formatSubsequenceExponent(term.exponent);
         const isZeroExponent = term.exponent.every(value => value === 0n);
@@ -1876,6 +2039,19 @@
           tex: formatted.map(term => term.tex).join(' + ') || '0',
           plain: formatted.map(term => term.plain).join(' + ') || '0'
         };
+      }
+
+      // 下限には最高次のωの冪だけを表示し、その係数は表示しない。
+      function formatSubsequenceOrderTypeLowerBound(term) {
+        if (term.exponent.every(value => value === 0n)) {
+          return { tex: '1', plain: '1' };
+        }
+        const alpha = formatSubsequenceExponent(term.exponent);
+        const exponentIsOne = term.exponent[term.exponent.length - 1] === 1n
+          && term.exponent.slice(0, -1).every(value => value === 0n);
+        return exponentIsOne
+          ? { tex: '\\omega', plain: 'ω' }
+          : { tex: `\\omega^{${alpha.tex}}`, plain: `ω^(${alpha.plain})` };
       }
 
       function computeSubsequenceOrderTypeUpperBound(language, alphabetSize, correctionExponent = null) {
@@ -1928,7 +2104,7 @@
         const upper = formatSubsequenceOrderTypeTerms(upperTerms);
         const leadingTerm = baseTerms[0] || null;
         const lower = leadingTerm
-          ? formatSubsequenceOrderTypeTerm(leadingTerm)
+          ? formatSubsequenceOrderTypeLowerBound(leadingTerm)
           : { tex: '0', plain: '0' };
 
         // 補正なしで項が高々1つなら上下限が一致し、厳密値が確定する。
@@ -1954,9 +2130,43 @@
         };
       }
 
+      function computeBinaryIdempotentOrderType(entry) {
+        const patterns = state.words
+          .map(word => word.compressedUnits || compressRuns(word.units || []))
+          .concat([entry.compressedUnits || compressRuns(entry.units || [])]);
+        if (!patterns.length || patterns.some(pattern => !pattern.length)) {
+          throw new Error('圧縮後の文字列を取得できません。');
+        }
+        const minimumLength = Math.min(...patterns.map(pattern => pattern.length));
+        const minimumPatterns = new Set(patterns
+          .filter(pattern => pattern.length === minimumLength)
+          .map(pattern => JSON.stringify(pattern)));
+        const value = 2n * BigInt(minimumLength) - (minimumPatterns.size >= 2 ? 1n : 0n);
+        return {
+          tex: `o(D) = ${value}`,
+          plain: `o(D) = ${value}`,
+          exact: true,
+          termCount: patterns.length,
+          correctionApplied: false
+        };
+      }
+
       function addSubsequenceWordToLanguage(entry, context) {
         try {
-          const patternMasks = entry.units.map(unit => {
+          if (context.idempotent && context.characters.length <= 2) {
+            if (context.characters.length === 1) {
+              entry.idempotentOrderTypeResult = {
+                tex: 'o(D) = 1', plain: 'o(D) = 1', exact: true,
+                termCount: 1, correctionApplied: false
+              };
+            } else {
+              entry.idempotentOrderTypeResult = computeBinaryIdempotentOrderType(entry);
+            }
+            return;
+          }
+
+          const sourceUnits = context.idempotent ? entry.compressedUnits : entry.units;
+          const patternMasks = sourceUnits.map(unit => {
             const index = context.indexMap.get(unit);
             if (index === undefined) throw new Error(`文字「${unit}」が順序型計算用の文字集合にありません。`);
             return 1n << BigInt(index);
@@ -1966,17 +2176,19 @@
           const nextLanguage = pruned.language;
           const pruningOccurred = state.subsequencePruningOccurred || pruned.pruned;
           const correctionExponent = pruningOccurred ? context.pruningThreshold : null;
-          const upperBound = computeSubsequenceOrderTypeUpperBound(
-            nextLanguage, context.characters.length, correctionExponent
-          );
+          const upperBound = context.idempotent
+            ? computeIdempotentOrderTypeUpperBound(nextLanguage, context.characters.length, correctionExponent)
+            : computeSubsequenceOrderTypeUpperBound(nextLanguage, context.characters.length, correctionExponent);
           entry.subsequenceLanguageBefore = state.subsequenceLanguage;
           entry.subsequencePruningOccurredBefore = state.subsequencePruningOccurred;
-          entry.subsequenceOrderTypeUpperBound = upperBound;
+          if (context.idempotent) entry.idempotentOrderTypeResult = upperBound;
+          else entry.subsequenceOrderTypeUpperBound = upperBound;
           state.subsequenceLanguage = nextLanguage;
           state.subsequencePruningOccurred = pruningOccurred;
         } catch (error) {
           state.orderTypeCalculationStopped = true;
-          state.orderTypeStopReason = `部分列の順序型計算中にエラーが発生したため、計算を停止しました（${error.message}）。このゲーム中は再開できません。`;
+          const ruleName = context.idempotent ? '冪等部分列' : '部分列';
+          state.orderTypeStopReason = `${ruleName}の順序型計算中にエラーが発生したため、計算を停止しました（${error.message}）。このゲーム中は再開できません。`;
           for (const oldEntry of state.words) delete oldEntry.subsequenceLanguageBefore;
           state.subsequenceLanguage = null;
           state.subsequenceOrderContext = null;
@@ -2227,7 +2439,7 @@
           remainingLabel.textContent = '残りの極大順序型の上界を表示する';
           remainingHelp.textContent = '';
           remainingHelp.hidden = true;
-        } else if (rules.ending === 'subsequence') {
+        } else if (rules.ending === 'subsequence' || rules.ending === 'idempotent') {
           remainingLabel.textContent = '残りの極大順序型の上界を表示する';
           remainingHelp.textContent = '';
           remainingHelp.hidden = true;
@@ -2236,15 +2448,31 @@
           remainingHelp.textContent = '末尾文字一致禁止では残りターン数、使用文字包含禁止では残りの極大順序型、可換部分列禁止ではその上界を表示します。';
         }
         const subsequenceOrderTypeApplicable = rules.ending === 'subsequence';
-        $('subsequenceShorteningField').hidden = !subsequenceOrderTypeApplicable;
+        const idempotentOrderTypeApplicable = rules.ending === 'idempotent';
+        const alphabetSpecForPrecision = getOrderTypeAlphabetSpec(rules);
+        const idempotentPrecisionApplicable = idempotentOrderTypeApplicable
+          && alphabetSpecForPrecision.valid && alphabetSpecForPrecision.chars.length >= 3;
+        $('subsequenceShorteningField').hidden = !(subsequenceOrderTypeApplicable || idempotentPrecisionApplicable);
+        const precisionHelp = $('subsequenceShorteningHelp');
+        if (precisionHelp) {
+          precisionHelp.textContent = idempotentOrderTypeApplicable
+            ? '精密さを引き換えに、順序型の上界の計算を高速化します。自然数をコンマで区切って「文字の種類-2」個書くと、それをω^{文字の種類-2}未満の順序数とみなし、次数が入力された順序数未満の項を無視して計算します。'
+            : '精密さを引き換えに、順序型の上界の計算を高速化します。自然数をコンマで区切って「文字の種類-1」個書くと、それをω^{文字の種類-1}未満の順序数とみなし、次数が入力された順序数未満の項を無視して計算します。';
+        }
+        const thresholdInput = $('subsequenceShorteningThreshold');
+        if (thresholdInput && alphabetSpecForPrecision.valid) {
+          const coefficientCount = Math.max(0, alphabetSpecForPrecision.chars.length - (idempotentOrderTypeApplicable ? 2 : 1));
+          const example = Array.from({ length: coefficientCount }, (_, index) => index === 0 ? '1' : '0').join(',');
+          thresholdInput.placeholder = coefficientCount ? `例：${example}` : '入力不要';
+        }
         const orderTypeKanaHelp = rules.characterSet === 'hiragana'
-          && (['alphabet', 'commutative'].includes(rules.ending) || subsequenceOrderTypeApplicable)
+          && (['alphabet', 'commutative'].includes(rules.ending) || subsequenceOrderTypeApplicable || idempotentOrderTypeApplicable)
           ? ' ひらがなの順序型計算では清音の基本文字のみを使い、小書き文字・伸ばし棒・濁点／半濁点付き文字は文字集合に含めません。正規化後にこれらが残る入力は使用できません。'
           : '';
-        if (['alphabet', 'commutative'].includes(rules.ending) || subsequenceOrderTypeApplicable) remainingHelp.textContent += orderTypeKanaHelp;
-        const remainingApplicable = ['last', 'alphabet', 'commutative'].includes(rules.ending) || subsequenceOrderTypeApplicable;
+        if (['alphabet', 'commutative'].includes(rules.ending) || subsequenceOrderTypeApplicable || idempotentOrderTypeApplicable) remainingHelp.textContent += orderTypeKanaHelp;
+        const remainingApplicable = ['last', 'alphabet', 'commutative'].includes(rules.ending) || subsequenceOrderTypeApplicable || idempotentOrderTypeApplicable;
         $('remainingOrderField').hidden = !remainingApplicable;
-        $('orderTypeDisclaimer').hidden = !(['alphabet', 'commutative'].includes(rules.ending) || subsequenceOrderTypeApplicable);
+        $('orderTypeDisclaimer').hidden = !(['alphabet', 'commutative'].includes(rules.ending) || subsequenceOrderTypeApplicable || idempotentOrderTypeApplicable);
         updateSubsequenceShorteningPreview();
         describeConstraintFunctions();
       }
@@ -2322,6 +2550,14 @@
             remainingFormula = entry.subsequenceOrderTypeUpperBound.tex;
             remainingFallback = entry.subsequenceOrderTypeUpperBound.plain;
             remainingDescription = entry.subsequenceOrderTypeUpperBound.exact
+              ? '残りの極大順序型'
+              : '残りの極大順序型の上下限';
+          } else if (rules.ending === 'idempotent'
+              && entry.idempotentOrderTypeResult
+              && typeof entry.idempotentOrderTypeResult.tex === 'string') {
+            remainingFormula = entry.idempotentOrderTypeResult.tex;
+            remainingFallback = entry.idempotentOrderTypeResult.plain;
+            remainingDescription = entry.idempotentOrderTypeResult.exact
               ? '残りの極大順序型'
               : '残りの極大順序型の上下限';
           }
@@ -3599,6 +3835,56 @@
         return createLongPrefixSuffixCandidate(rules, alphabet, c, previous, bounds);
       }
 
+      function transitionDemoToSolo() {
+        if (!isDemoMode() || !isDemoRuleValidationEnabled()) return;
+        if (state.demoBatchRunning) {
+          feedback('お手本の連続生成中は切り替えできません。生成が終わってから操作してください。');
+          return;
+        }
+
+        // 開始前なら、参加人数だけを1人に変更する。
+        if (!state.started) {
+          $('playerCountSetting').value = '1';
+          configurePlayerCount('1');
+          feedback('1人プレイに切り替えました。その他のルール設定は維持しています。', 'success');
+          $('wordInput').focus();
+          return;
+        }
+
+        // お手本が違反手を出して終了していた場合、その最後の違反手は
+        // プレイヤーの挑戦には含めず、直前までの有効な列から続ける。
+        if (state.finished && state.endReason === 'demo-foul') {
+          const lastEntry = state.history[state.history.length - 1];
+          if (lastEntry && lastEntry.foul) {
+            state.history.pop();
+            removeLastHistoryEntry();
+          }
+        }
+
+        const previousName = state.playerNames[0];
+        $('playerCountSetting').value = '1';
+        state.playerNames = [previousName && previousName !== 'お手本CPU' ? previousName : 'プレイヤー1'];
+        state.playerCounts = [state.words.length];
+        state.activePlayers = [true];
+        state.eliminationOrder = [];
+        state.turn = 0;
+        state.finished = false;
+        state.winner = null;
+        state.loser = null;
+        state.endReason = null;
+        state.noMoveDetail = null;
+        state.demoBatchRunning = false;
+        // お手本生成専用の先読み列は、手動プレイでは使わない。
+        state.demoAlphabetSequence = null;
+        state.demoCommutativeSequence = null;
+
+        renderPlayerCards();
+        updateHistoryOwnerNames();
+        render();
+        feedback(`1人プレイに移行しました。お手本の有効な${state.words.length}ターンを引き継いで続けられます。`, 'success');
+        if (!state.finished) $('wordInput').focus();
+      }
+
       function runDemoSteps(requestedSteps) {
         if (!isDemoMode() || !state.started || state.finished) return;
         const steps = Number(requestedSteps);
@@ -3846,10 +4132,16 @@
         });
         const remainingRule = $('endingRule').value;
         const subsequenceOrderApplicable = remainingRule === 'subsequence';
-        const remainingCounterApplicable = ['last', 'alphabet', 'commutative'].includes(remainingRule) || subsequenceOrderApplicable;
+        const idempotentOrderApplicable = remainingRule === 'idempotent';
+        const precisionAlphabet = getOrderTypeAlphabetSpec(currentRules());
+        const idempotentPrecisionApplicable = idempotentOrderApplicable
+          && precisionAlphabet.valid && precisionAlphabet.chars.length >= 3;
+        const shorteningApplicable = subsequenceOrderApplicable || idempotentPrecisionApplicable;
+        const remainingCounterApplicable = ['last', 'alphabet', 'commutative'].includes(remainingRule)
+          || subsequenceOrderApplicable || idempotentOrderApplicable;
         $('showRemainingTurns').disabled = settingsLocked || !remainingCounterApplicable;
-        $('enableSubsequenceShortening').disabled = settingsLocked || !subsequenceOrderApplicable || !$('showRemainingTurns').checked;
-        $('subsequenceShorteningThreshold').disabled = settingsLocked || !subsequenceOrderApplicable
+        $('enableSubsequenceShortening').disabled = settingsLocked || !shorteningApplicable || !$('showRemainingTurns').checked;
+        $('subsequenceShorteningThreshold').disabled = settingsLocked || !shorteningApplicable
           || !$('showRemainingTurns').checked || !$('enableSubsequenceShortening').checked;
         $('nRule').disabled = settingsLocked || characterSet === 'latin' || characterSet === 'digits';
         $('reciprocalRule').disabled = settingsLocked || !reciprocalApplicable.has($('endingRule').value);
@@ -3870,6 +4162,7 @@
             ? '1人プレイ：自分がルール違反をするまで悪列を伸ばします。'
             : `${activePlayerIndexes().length}人参加中 · 反則した人は脱落し、残りの人で続行します。`;
         $('demoControls').hidden = !isDemoMode() || !state.started || state.finished;
+        $('demoToSoloPanel').hidden = !isDemoMode() || !isDemoRuleValidationEnabled() || state.demoBatchRunning;
         updateDemoStepWarning();
         $('wordForm').hidden = isDemoMode();
         $('connectionToggleWrap').hidden = isDemoMode();
@@ -3985,7 +4278,7 @@
         }
         $('undoButton').disabled = state.history.length === 0;
         const orderTypeCalculationConfigured = state.started
-          && (['alphabet', 'commutative'].includes(remainingRule) || subsequenceOrderApplicable)
+          && (['alphabet', 'commutative'].includes(remainingRule) || subsequenceOrderApplicable || idempotentOrderApplicable)
           && $('showRemainingTurns').checked;
         $('stopAlphabetOrderTypeButton').hidden = !orderTypeCalculationConfigured || state.orderTypeCalculationStopped;
         $('orderTypeCalculationStoppedNote').hidden = !orderTypeCalculationConfigured || !state.orderTypeCalculationStopped;
@@ -3993,6 +4286,7 @@
         syncConnectionInput();
         const foulCount = state.history.filter(entry => entry.foul).length;
         $('historyCount').textContent = `${state.words.length} 有効ターン · ${foulCount} 反則`;
+        $('downloadGameSaveButton').disabled = !state.started;
       }
 
       function validateGameSettings() {
@@ -4047,14 +4341,20 @@
           const spec = classifyCustomAlphabet(rules.customAlphabet);
           if (!spec.valid) { feedback(spec.message); return false; }
         }
-        if (rules.ending === 'subsequence' && rules.showRemainingTurns && rules.enableSubsequenceShortening) {
+        if (['subsequence', 'idempotent'].includes(rules.ending)
+            && rules.showRemainingTurns && rules.enableSubsequenceShortening) {
           const alphabetSpec = getOrderTypeAlphabetSpec(rules);
           if (!alphabetSpec.valid) { feedback(alphabetSpec.message || '文字集合を確認してください。'); return false; }
-          try {
-            parseSubsequencePruningThreshold(rules.subsequenceShorteningThreshold, alphabetSpec.chars.length);
-          } catch (error) {
-            feedback(`計算の短縮の設定を確認してください：${error.message}`);
-            return false;
+          const idempotentPrecision = rules.ending === 'idempotent';
+          if (!idempotentPrecision || alphabetSpec.chars.length >= 3) {
+            try {
+              parseSubsequencePruningThreshold(
+                rules.subsequenceShorteningThreshold, alphabetSpec.chars.length, idempotentPrecision
+              );
+            } catch (error) {
+              feedback(`計算の短縮の設定を確認してください：${error.message}`);
+              return false;
+            }
           }
         }
         if (isGapRule(rules.ending)) {
@@ -4071,6 +4371,329 @@
         }
         return true;
       }
+      const GAME_SAVE_FORMAT = 'kotoba-tsunagou-save';
+      const GAME_SAVE_VERSION = 1;
+      const MAX_GAME_SAVE_BYTES = 50 * 1024 * 1024;
+
+      function serializeOrderTypeResults(entry) {
+        const results = {};
+        if (typeof entry.remainingOrderType === 'bigint') {
+          results.remainingOrderType = entry.remainingOrderType.toString();
+        }
+        if (Array.isArray(entry.commutativeOrderUpperBound)) {
+          results.commutativeOrderUpperBound = entry.commutativeOrderUpperBound.map(value => BigInt(value).toString());
+        }
+        if (entry.subsequenceOrderTypeUpperBound && typeof entry.subsequenceOrderTypeUpperBound === 'object') {
+          const value = entry.subsequenceOrderTypeUpperBound;
+          results.subsequenceOrderTypeUpperBound = {
+            tex: String(value.tex ?? ''),
+            plain: String(value.plain ?? ''),
+            exact: Boolean(value.exact),
+            termCount: Number.isSafeInteger(value.termCount) ? value.termCount : null,
+            correctionApplied: Boolean(value.correctionApplied)
+          };
+        }
+        if (entry.idempotentOrderTypeResult && typeof entry.idempotentOrderTypeResult === 'object') {
+          const value = entry.idempotentOrderTypeResult;
+          results.idempotentOrderTypeResult = {
+            tex: String(value.tex ?? ''),
+            plain: String(value.plain ?? ''),
+            exact: Boolean(value.exact),
+            termCount: Number.isSafeInteger(value.termCount) ? value.termCount : null,
+            correctionApplied: Boolean(value.correctionApplied)
+          };
+        }
+        return results;
+      }
+
+      function createGameSaveData() {
+        if (!state.started) throw new Error('ゲーム開始後に履歴を保存できます。');
+        const settings = {};
+        for (const id of settingIds) {
+          const element = $(id);
+          settings[id] = element.type === 'checkbox' ? element.checked : element.value;
+        }
+        return {
+          format: GAME_SAVE_FORMAT,
+          version: GAME_SAVE_VERSION,
+          savedAt: new Date().toISOString(),
+          settings: {
+            playerCount: $('playerCountSetting').value,
+            demoRuleValidation: $('demoRuleValidation').checked,
+            values: settings
+          },
+          state: {
+            started: state.started,
+            finished: state.finished,
+            turn: state.turn,
+            playerNames: state.playerNames.slice(),
+            playerCounts: state.playerCounts.slice(),
+            activePlayers: state.activePlayers.slice(),
+            eliminationOrder: state.eliminationOrder.slice(),
+            winner: state.winner,
+            loser: state.loser,
+            endReason: state.endReason,
+            autoInsertConnection: state.autoInsertConnection,
+            orderTypeCalculationStopped: state.orderTypeCalculationStopped,
+            orderTypeStopReason: state.orderTypeStopReason
+          },
+          history: state.history.map(entry => ({
+            display: String(entry.display ?? entry.memo ?? ''),
+            memo: String(entry.memo ?? ''),
+            player: entry.player,
+            turnIndex: entry.turnIndex,
+            foul: Boolean(entry.foul),
+            automatic: Boolean(entry.automatic),
+            ruleViolation: Boolean(entry.ruleViolation),
+            foulReason: entry.foulReason == null ? null : String(entry.foulReason),
+            conflictWith: entry.conflictWith == null ? null : String(entry.conflictWith),
+            next: entry.next == null ? null : String(entry.next),
+            nextJoinCount: Number.isSafeInteger(entry.nextJoinCount) ? entry.nextJoinCount : 0,
+            orderTypeResults: serializeOrderTypeResults(entry)
+          }))
+        };
+      }
+
+      function isPlainObject(value) {
+        return value !== null && typeof value === 'object' && !Array.isArray(value);
+      }
+
+      function parseSavedBigInt(value, label) {
+        if (typeof value !== 'string' || !/^-?\d+$/.test(value)) {
+          throw new Error(`${label}の保存形式が正しくありません。`);
+        }
+        return BigInt(value);
+      }
+
+      function validateGameSaveData(data) {
+        if (!isPlainObject(data) || data.format !== GAME_SAVE_FORMAT || data.version !== GAME_SAVE_VERSION) {
+          throw new Error('対応していない保存データです。');
+        }
+        if (!isPlainObject(data.settings) || !isPlainObject(data.settings.values) || !isPlainObject(data.state)) {
+          throw new Error('設定またはゲーム状態のデータがありません。');
+        }
+        const settings = data.settings;
+        const playerCount = String(settings.playerCount);
+        if (!['0','1','2','3','4','5','6','7','8','9','10'].includes(playerCount)) {
+          throw new Error('参加人数の保存内容が正しくありません。');
+        }
+        if (typeof settings.demoRuleValidation !== 'boolean') throw new Error('お手本モードの判定設定が正しくありません。');
+        for (const id of settingIds) {
+          if (!(id in settings.values)) throw new Error(`設定「${id}」が保存データにありません。`);
+          const element = $(id);
+          const value = settings.values[id];
+          if (element.type === 'checkbox') {
+            if (typeof value !== 'boolean') throw new Error(`設定「${id}」が正しくありません。`);
+          } else if (typeof value !== 'string') {
+            throw new Error(`設定「${id}」が正しくありません。`);
+          } else if (element.tagName === 'SELECT'
+              && !Array.from(element.options).some(option => option.value === value)) {
+            throw new Error(`設定「${id}」に未対応の値があります。`);
+          } else if (value.length > 4096) {
+            throw new Error(`設定「${id}」が長すぎます。`);
+          }
+        }
+        const savedState = data.state;
+        if (savedState.started !== true || typeof savedState.finished !== 'boolean') {
+          throw new Error('開始済みのゲームデータではありません。');
+        }
+        const playerLength = playerCount === '0' ? 1 : Number(playerCount);
+        if (!Array.isArray(savedState.playerNames) || savedState.playerNames.length !== playerLength
+            || savedState.playerNames.some(name => typeof name !== 'string' || name.length > 16)) {
+          throw new Error('プレイヤー名の保存内容が正しくありません。');
+        }
+        if (!Array.isArray(savedState.playerCounts) || savedState.playerCounts.length !== playerLength
+            || savedState.playerCounts.some(count => !Number.isSafeInteger(count) || count < 0)) {
+          throw new Error('参加回数の保存内容が正しくありません。');
+        }
+        if (!Array.isArray(savedState.activePlayers) || savedState.activePlayers.length !== playerLength
+            || savedState.activePlayers.some(active => typeof active !== 'boolean')) {
+          throw new Error('プレイヤーの参加状態が正しくありません。');
+        }
+        if (!Array.isArray(savedState.eliminationOrder)
+            || savedState.eliminationOrder.some(index => !Number.isInteger(index) || index < 0 || index >= playerLength)) {
+          throw new Error('脱落順の保存内容が正しくありません。');
+        }
+        if (!Number.isInteger(savedState.turn) || savedState.turn < -1 || savedState.turn >= playerLength) {
+          throw new Error('現在のターンの保存内容が正しくありません。');
+        }
+        for (const key of ['autoInsertConnection']) {
+          if (typeof savedState[key] !== 'boolean') throw new Error('入力設定の保存内容が正しくありません。');
+        }
+        if (!Array.isArray(data.history) || data.history.length > 1000000) {
+          throw new Error('履歴の件数が不正、または上限を超えています。');
+        }
+        for (const [index, entry] of data.history.entries()) {
+          if (!isPlainObject(entry) || typeof entry.memo !== 'string' || typeof entry.display !== 'string'
+              || !Number.isInteger(entry.player) || entry.player < 0 || entry.player >= playerLength
+              || !Number.isSafeInteger(entry.turnIndex) || entry.turnIndex < 1
+              || typeof entry.foul !== 'boolean') {
+            throw new Error(`履歴の${index + 1}件目が正しくありません。`);
+          }
+          if (entry.memo.length > 1000000 || entry.display.length > 1000000) {
+            throw new Error(`履歴の${index + 1}件目が長すぎます。`);
+          }
+          if (entry.orderTypeResults != null) {
+            if (!isPlainObject(entry.orderTypeResults)) throw new Error('順序型の保存結果が正しくありません。');
+            const result = entry.orderTypeResults;
+            if (result.remainingOrderType !== undefined) parseSavedBigInt(result.remainingOrderType, '使用文字包含の順序型');
+            if (result.commutativeOrderUpperBound !== undefined) {
+              if (!Array.isArray(result.commutativeOrderUpperBound)) throw new Error('可換部分列の順序型が正しくありません。');
+              result.commutativeOrderUpperBound.forEach(value => parseSavedBigInt(value, '可換部分列の順序型'));
+            }
+            if (result.subsequenceOrderTypeUpperBound !== undefined) {
+              const bound = result.subsequenceOrderTypeUpperBound;
+              if (!isPlainObject(bound) || typeof bound.tex !== 'string' || typeof bound.plain !== 'string') {
+                throw new Error('部分列の順序型の保存結果が正しくありません。');
+              }
+            }
+            if (result.idempotentOrderTypeResult !== undefined) {
+              const bound = result.idempotentOrderTypeResult;
+              if (!isPlainObject(bound) || typeof bound.tex !== 'string' || typeof bound.plain !== 'string') {
+                throw new Error('冪等部分列の順序型の保存結果が正しくありません。');
+              }
+            }
+          }
+        }
+        if (savedState.winner !== null && (!Number.isInteger(savedState.winner) || savedState.winner < 0 || savedState.winner >= playerLength)) {
+          throw new Error('勝者の保存内容が正しくありません。');
+        }
+        if (savedState.loser !== null && (!Number.isInteger(savedState.loser) || savedState.loser < 0 || savedState.loser >= playerLength)) {
+          throw new Error('敗者の保存内容が正しくありません。');
+        }
+      }
+
+      function restoreGameFromSaveData(data) {
+        validateGameSaveData(data);
+        const rulesValues = data.settings.values;
+        for (const id of settingIds) {
+          const element = $(id);
+          if (element.type === 'checkbox') element.checked = rulesValues[id];
+          else element.value = rulesValues[id];
+        }
+        $('playerCountSetting').value = String(data.settings.playerCount);
+        $('demoRuleValidation').checked = data.settings.demoRuleValidation;
+        state.playerNames = data.state.playerNames.slice();
+        state.playerCounts = data.state.playerCounts.slice();
+        state.activePlayers = data.state.activePlayers.slice();
+        state.eliminationOrder = data.state.eliminationOrder.slice();
+        state.turn = data.state.turn;
+        state.started = true;
+        state.finished = data.state.finished;
+        state.winner = data.state.winner;
+        state.loser = data.state.loser;
+        state.endReason = data.state.endReason ?? null;
+        state.autoInsertConnection = data.state.autoInsertConnection;
+        state.autoInsertedPrefix = '';
+        state.demoBatchRunning = false;
+        state.demoAlphabetSequence = null;
+        state.demoCommutativeSequence = null;
+        state.alphabetFamily = [];
+        state.alphabetOrderContext = null;
+        state.commutativeFamily = [];
+        state.commutativeOrderContext = null;
+        state.subsequenceLanguage = null;
+        state.subsequenceOrderContext = null;
+        state.subsequencePruningOccurred = false;
+        state.fastLookup = new Map();
+        state.gapMaskBytes = 0;
+
+        const rules = currentRules();
+        const gapInfo = isGapRule(rules.ending) ? getGapOrderInfo(rules) : null;
+        state.words = [];
+        state.history = data.history.map(saved => {
+          const entry = {
+            display: saved.display,
+            memo: saved.memo,
+            player: saved.player,
+            turnIndex: saved.turnIndex,
+            foul: saved.foul,
+            ruleViolation: Boolean(saved.ruleViolation || saved.foul),
+            automatic: Boolean(saved.automatic),
+            foulReason: saved.foulReason == null ? '' : String(saved.foulReason),
+            conflictWith: saved.conflictWith == null ? null : String(saved.conflictWith),
+            next: saved.next == null ? null : String(saved.next),
+            nextJoinCount: Number.isSafeInteger(saved.nextJoinCount) ? saved.nextJoinCount : 0
+          };
+          if (!entry.foul) {
+            const comparisonData = prepareComparisonData(entry.memo, rules, gapInfo);
+            Object.assign(entry, comparisonData);
+            if (rules.ending === 'same') {
+              entry.indexed = true;
+              entry.indexKey = entry.memo;
+              state.fastLookup.set(entry.indexKey, entry);
+            } else if (rules.ending === 'last') {
+              entry.indexed = true;
+              entry.indexKey = entry.units[entry.units.length - 1] || '';
+              state.fastLookup.set(entry.indexKey, entry);
+            }
+            state.words.push(entry);
+          }
+          const results = saved.orderTypeResults || {};
+          if (results.remainingOrderType !== undefined) entry.remainingOrderType = parseSavedBigInt(results.remainingOrderType, '使用文字包含の順序型');
+          if (Array.isArray(results.commutativeOrderUpperBound)) {
+            entry.commutativeOrderUpperBound = results.commutativeOrderUpperBound.map(value => parseSavedBigInt(value, '可換部分列の順序型'));
+          }
+          if (results.subsequenceOrderTypeUpperBound) entry.subsequenceOrderTypeUpperBound = { ...results.subsequenceOrderTypeUpperBound };
+          if (results.idempotentOrderTypeResult) entry.idempotentOrderTypeResult = { ...results.idempotentOrderTypeResult };
+          return entry;
+        });
+
+        // 保存データから再開する場合、既存の計算結果だけを表示し、新しいターンでは順序型を計算しない。
+        const rulesNeedOrderTypeStop = rules.showRemainingTurns
+          && ['alphabet', 'commutative', 'subsequence', 'idempotent'].includes(rules.ending);
+        state.orderTypeCalculationStopped = Boolean(rulesNeedOrderTypeStop || data.state.orderTypeCalculationStopped);
+        state.orderTypeStopReason = rulesNeedOrderTypeStop
+          ? '保存データから再開したため、以後の順序型計算は行いません。'
+          : (data.state.orderTypeStopReason || '');
+
+        renderPlayerCards();
+        showEmptyHistory();
+        state.history.forEach((entry, index) => appendHistoryEntry(entry, index));
+        $('wordInput').value = '';
+        $('demoStatus').textContent = '保存データから再開しました。';
+        $('nonWqoWarning').hidden = true;
+        render();
+      }
+
+      function downloadGameSave() {
+        try {
+          const data = createGameSaveData();
+          const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const anchor = document.createElement('a');
+          const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+          anchor.href = url;
+          anchor.download = `kotoba-game-${stamp}.json`;
+          document.body.append(anchor);
+          anchor.click();
+          anchor.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+          feedback('ゲーム履歴をJSONファイルに保存しました。', 'success');
+        } catch (error) {
+          feedback(`履歴を保存できませんでした：${error.message}`);
+        }
+      }
+
+      async function loadGameSaveFile(file) {
+        if (!file) return;
+        try {
+          if (file.size > MAX_GAME_SAVE_BYTES) throw new Error('保存ファイルが50MBを超えています。');
+          const data = JSON.parse(await file.text());
+          validateGameSaveData(data);
+          if (!window.confirm('現在のゲームを置き換えて保存データを読み込みます。本当によろしいですか？')) return;
+          restoreGameFromSaveData(data);
+          feedback(state.orderTypeCalculationStopped
+            ? 'ゲーム履歴を読み込みました。保存済みの順序型結果は表示し、以後の順序型計算は行いません。'
+            : 'ゲーム履歴を読み込みました。続きからプレイできます。', 'success');
+          if (!state.finished && !isDemoMode()) $('wordInput').focus();
+        } catch (error) {
+          feedback(`履歴を読み込めませんでした：${error.message}`);
+        } finally {
+          $('loadGameSaveInput').value = '';
+        }
+      }
+
       function startGameNow() {
         state.alphabetFamily = [];
         state.alphabetOrderContext = null;
@@ -4094,11 +4717,20 @@
             state.commutativeOrderContext = createCommutativeOrderContext(orderTypeAlphabet);
           }
           if (trackSubsequenceOrder && orderTypeAlphabet.valid) {
-            const pruningThreshold = startRules.enableSubsequenceShortening
-              ? parseSubsequencePruningThreshold(startRules.subsequenceShorteningThreshold, orderTypeAlphabet.chars.length)
+            const idempotentOrder = startRules.ending === 'idempotent';
+            const useShortening = startRules.enableSubsequenceShortening
+              && (!idempotentOrder || orderTypeAlphabet.chars.length >= 3);
+            const pruningThreshold = useShortening
+              ? parseSubsequencePruningThreshold(
+                  startRules.subsequenceShorteningThreshold, orderTypeAlphabet.chars.length, idempotentOrder
+                )
               : null;
-            state.subsequenceOrderContext = createSubsequenceOrderContext(orderTypeAlphabet, pruningThreshold);
-            state.subsequenceLanguage = createInitialSubsequenceLanguage(state.subsequenceOrderContext);
+            state.subsequenceOrderContext = createSubsequenceOrderContext(
+              orderTypeAlphabet, pruningThreshold, idempotentOrder
+            );
+            state.subsequenceLanguage = idempotentOrder && orderTypeAlphabet.chars.length <= 2
+              ? null
+              : createInitialSubsequenceLanguage(state.subsequenceOrderContext);
           }
         }
         state.started = true;
@@ -4310,7 +4942,8 @@
         if (shouldTrackCommutativeOrderBound(rules) && state.commutativeOrderContext && entry.unitCounts) {
           addCommutativeVectorToFamily(entry, state.commutativeOrderContext);
         }
-        if (shouldTrackSubsequenceOrderType(rules) && state.subsequenceOrderContext && state.subsequenceLanguage) {
+        if (shouldTrackSubsequenceOrderType(rules) && state.subsequenceOrderContext
+            && (state.subsequenceLanguage || state.subsequenceOrderContext.idempotent)) {
           addSubsequenceWordToLanguage(entry, state.subsequenceOrderContext);
         }
         state.words.push(entry);
@@ -4331,12 +4964,20 @@
         }
       }
 
+      $('downloadGameSaveButton').addEventListener('click', downloadGameSave);
+      $('loadGameSaveButton').addEventListener('click', () => $('loadGameSaveInput').click());
+      $('loadGameSaveInput').addEventListener('change', event => {
+        const file = event.target.files && event.target.files[0];
+        loadGameSaveFile(file);
+      });
+
       // ボタンのクリックとEnterキーの両方から同じ処理を呼び出す。
       $('startGameButton').addEventListener('click', requestStartGame);
       $('cancelWarningButton').addEventListener('click', () => { $('nonWqoWarning').hidden = true; $('startGameButton').focus(); });
       $('confirmWarningButton').addEventListener('click', startGameNow);
       $('nonWqoWarning').addEventListener('click', (event) => { if (event.target === $('nonWqoWarning')) $('cancelWarningButton').click(); });
 
+      $('demoToSoloButton').addEventListener('click', transitionDemoToSolo);
       $('demoNextButton').addEventListener('click', () => runDemoSteps(1));
       function updateDemoStepWarning() {
         const count = Number($('demoStepCount').value);
@@ -4369,7 +5010,7 @@
       $('stopAlphabetOrderTypeButton').addEventListener('click', () => {
         const rules = currentRules();
         if (!state.started || state.orderTypeCalculationStopped
-            || !(['alphabet', 'commutative'].includes(rules.ending) || (rules.ending === 'subsequence'))
+            || !(['alphabet', 'commutative'].includes(rules.ending) || ['subsequence', 'idempotent'].includes(rules.ending))
             || !rules.showRemainingTurns) return;
         if (!window.confirm('再度計算し直すことはできません。本当によろしいですか？')) return;
 
