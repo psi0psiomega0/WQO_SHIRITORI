@@ -84,6 +84,8 @@
     .rule-select:disabled { opacity: .65; color: #737b73; background: #f4f3ee; }
     .setting-help { min-height: 34px; margin: 0; color: #858c83; font-size: 11px; line-height: 1.55; }
     .setting-help.error { color: var(--red); }
+    .subsequence-threshold-preview-label { min-height: 0; }
+    .subsequence-threshold-preview-label strong { color: var(--ink); font-size: 13px; font-weight: 700; }
     .setting-checkbox { display: inline-flex; align-items: center; gap: 8px; width: fit-content; color: #5d6d60; font-size: 12px; font-weight: 750; cursor: pointer; }
     .setting-checkbox input { width: 15px; height: 15px; margin: 0; accent-color: var(--green); }
     .setting-checkbox input:disabled { opacity: .6; }
@@ -161,9 +163,9 @@
     .history-item.rule-violation .word, .history-item.rule-violation .owner { color: var(--red); }
     .history-item.rule-violation .owner { font-weight: 800; }
     .history-list { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 8px; min-height: 38px; max-height: 420px; overflow: auto; padding: 2px 3px 8px 0; }
-    .history-item { display: inline-flex; align-items: center; gap: 8px; padding: 8px 11px; border: 1px solid var(--line); border-radius: 10px; background: white; }
-    .history-item .number { color: #a0a69d; font-size: 10px; }
-    .history-item .word { color: var(--ink); font-size: 14px; font-weight: 700; }
+    .history-item { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 8px; padding: 8px 11px; border: 1px solid var(--line); border-radius: 10px; background: white; white-space: nowrap; }
+    .history-item .number { color: #a0a69d; font-size: 10px; white-space: nowrap; }
+    .history-item .word { color: var(--ink); font-size: 14px; font-weight: 700; white-space: nowrap; }
     .history-item .owner { color: var(--muted); font-size: 10px; }
     .history-item .remaining { display: inline-flex; align-items: baseline; gap: 4px; color: var(--green-dark); font-size: 11px; white-space: nowrap; }
     .history-item .remaining-math { display: inline-flex; align-items: baseline; min-height: 1em; font-size: 13px; }
@@ -257,8 +259,21 @@
                 <input id="showRemainingTurns" type="checkbox">
                 <span id="showRemainingTurnsLabel">残りのターン数・極大順序型を表示する</span>
               </label>
-              <p class="setting-help" id="showRemainingTurnsHelp">末尾文字一致禁止では残りターン数、使用文字包含禁止では残りの極大順序型、可換部分列禁止ではその上界を表示します。</p>
-              <p class="setting-help" id="orderTypeDisclaimer" hidden>厳密値である保証がないものは、表示しなかったり上限や下限で表示します。WQOであれば実際の極大順序型はターンごとに減少しますが、精密に求まらない場合は表示する順序型の下限や上限が減少しない場合もあります。</p>
+              <p class="setting-help" id="showRemainingTurnsHelp">選択した禁止条件に応じて、残りのターン数または残りの極大順序型を表示します。</p>
+              <p class="setting-help" id="orderTypeDisclaimer" hidden>厳密値である保証がないものは、表示しなかったり上限や下限で表示します。WQOであれば実際の極大順序型はターンごとに減少しますが、精密に求まらない場合は表示する順序型の下限や上限が減少しない場合もあります。また、計算に非常に時間がかかる可能性があります。</p>
+              <div class="setting-field" id="subsequenceShorteningField" hidden>
+                <label class="setting-checkbox" for="enableSubsequenceShortening">
+                  <input id="enableSubsequenceShortening" type="checkbox">
+                  <span class="setting-label">計算の短縮</span>
+                </label>
+                <p class="setting-help">精密さを引き換えに、順序型の上界の計算を高速化します。自然数をコンマで区切って「文字の種類-1」個書くと、それをω^{文字の種類-1}未満の順序数とみなし、次数が入力された順序数未満の項を無視して計算します。</p>
+                <label class="setting-field" for="subsequenceShorteningThreshold">
+                  <span class="setting-label">次数の下限 α（係数を降順に入力）</span>
+                  <input class="rule-select" id="subsequenceShorteningThreshold" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="例：1,0,3">
+                </label>
+                <p class="setting-help subsequence-threshold-preview-label">現在入力されている順序数：<strong id="subsequenceShorteningOrdinalPreview">順序数を入力してください</strong></p>
+                <p class="setting-help">未満の次数の計算を省略します。</p>
+              </div>
             </div>
           </div>
         </section>
@@ -471,7 +486,12 @@
         alphabetOrderContext: null,
         commutativeFamily: [],
         commutativeOrderContext: null,
+        // 部分列禁止の残り言語を積和標準形で保持する。
+        subsequenceLanguage: null,
+        subsequenceOrderContext: null,
+        subsequencePruningOccurred: false,
         orderTypeCalculationStopped: false,
+        orderTypeStopReason: '',
         started: false,
         finished: false,
         demoBatchRunning: false,
@@ -513,7 +533,7 @@
           String.fromCharCode(ch.charCodeAt(0) - 0x60)
         );
       }
-      const settingIds = ['characterSet', 'customAlphabet', 'showRemainingTurns', 'longRule', 'dakutenRule', 'smallRule', 'tsuRule', 'nRule', 'endingRule', 'reciprocalRule', 'minLengthFunction', 'maxLengthFunction', 'joinLengthFunction'];
+      const settingIds = ['characterSet', 'customAlphabet', 'showRemainingTurns', 'enableSubsequenceShortening', 'subsequenceShorteningThreshold', 'longRule', 'dakutenRule', 'smallRule', 'tsuRule', 'nRule', 'endingRule', 'reciprocalRule', 'minLengthFunction', 'maxLengthFunction', 'joinLengthFunction'];
       const kanaOnlySettingIds = ['longRule', 'dakutenRule', 'smallRule', 'tsuRule'];
       const smallOtherKana = new Set(Object.keys(smallToLarge));
 
@@ -573,6 +593,8 @@
           characterSet: $('characterSet').value,
           customAlphabet: $('customAlphabet').value,
           showRemainingTurns: $('showRemainingTurns').checked,
+          enableSubsequenceShortening: $('enableSubsequenceShortening').checked,
+          subsequenceShorteningThreshold: $('subsequenceShorteningThreshold').value.trim(),
           long: $('longRule').value,
           dakuten: $('dakutenRule').value,
           small: $('smallRule').value,
@@ -1349,12 +1371,19 @@
         };
       }
 
-      // 可換部分列ではω^(k-1), ω^(k-2)の係数が厳密。
-      // それより低い次数の係数が残る場合は、その2項だけを下限として表示する。
+      // 可換部分列では、最高次数が k-1 の場合は k-1 次と k-2 次の係数が厳密。
+      // それ以外の場合は最高次の係数のみを下限として表示する。
       function formatCommutativeOrderEstimate(coefficients) {
         const upper = formatOrdinalExpression(coefficients);
-        const lowerCoefficients = coefficients.map((value, index) => index < 2 ? value : 0n);
-        const hasLowerTerms = coefficients.slice(2).some(value => value !== 0n);
+        const leadingIndex = coefficients.findIndex(value => value !== 0n);
+        if (leadingIndex < 0) {
+          return { tex: upper.tex, plain: upper.plain, exact: true };
+        }
+        // 係数配列は [ω^(k-1), ..., 1] の順。
+        // 最高次数が k-1（先頭成分が非零）なら、次の k-2 次まで下限に含める。
+        const lowerEndIndex = leadingIndex === 0 ? Math.min(1, coefficients.length - 1) : leadingIndex;
+        const lowerCoefficients = coefficients.map((value, index) => index <= lowerEndIndex ? value : 0n);
+        const hasLowerTerms = coefficients.slice(lowerEndIndex + 1).some(value => value !== 0n);
         if (!hasLowerTerms) {
           return { tex: upper.tex, plain: upper.plain, exact: true };
         }
@@ -1493,6 +1522,468 @@
           && rules.showRemainingTurns
           && !state.orderTypeCalculationStopped;
       }
+
+      // 部分列禁止の残り言語を、文字集合因子・Kleene閉包因子からなる積和標準形で保持する。
+      // 保存する言語には、空集合の処理と、包含関係のある隣接Kleene閉包の統合だけを適用する。
+      function shouldTrackSubsequenceOrderType(rules) {
+        return rules.ending === 'subsequence'
+          && rules.showRemainingTurns
+          && !state.orderTypeCalculationStopped;
+      }
+
+      function createSubsequenceOrderContext(alphabetSpec, pruningThreshold = null) {
+        const baseRank = new Map(alphabetSpec.order.map((unit, index) => [unit, index]));
+        const characters = alphabetSpec.chars.slice().sort((a, b) => baseRank.get(a) - baseRank.get(b));
+        const indexMap = new Map(characters.map((unit, index) => [unit, index]));
+        const fullMask = (1n << BigInt(characters.length)) - 1n;
+        return { characters, indexMap, fullMask, pruningThreshold };
+      }
+
+      // α<ω^(n-1) を、ω^(n-2),...,ω,1 の係数列として読み取る。
+      // n=1の場合は係数が0個なので、空欄だけを0として受け付ける。
+      function parseSubsequencePruningThreshold(value, alphabetSize) {
+        const expectedCount = Math.max(0, alphabetSize - 1);
+        const source = String(value ?? '').trim();
+        const parts = expectedCount === 0 && source === '' ? [] : source.split(',').map(part => part.trim());
+        if (parts.length !== expectedCount) {
+          throw new Error(`次数の係数は、文字の種類-1である${expectedCount}個をコンマ区切りで入力してください。`);
+        }
+        const coefficients = parts.map((part, index) => {
+          if (!/^\d+$/.test(part)) {
+            throw new Error(`次数の第${index + 1}係数「${part}」は0以上の整数で入力してください。`);
+          }
+          return BigInt(part);
+        });
+        return [0n, ...coefficients];
+      }
+
+      function updateSubsequenceShorteningPreview() {
+        const preview = $('subsequenceShorteningOrdinalPreview');
+        if (!preview) return;
+        const rules = currentRules();
+        const alphabetSpec = getOrderTypeAlphabetSpec(rules);
+        if (!alphabetSpec.valid) {
+          preview.dataset.mathRenderToken = String((Number(preview.dataset.mathRenderToken) || 0) + 1);
+          preview.textContent = '文字集合を確認してください';
+          return;
+        }
+        try {
+          const coefficients = parseSubsequencePruningThreshold(
+            rules.subsequenceShorteningThreshold,
+            alphabetSpec.chars.length
+          );
+          const formatted = formatOrdinalExpression(coefficients);
+          renderRemainingTurnsMath(preview, `\\alpha = ${formatted.tex}`, '入力順序数', `α = ${formatted.plain}`);
+        } catch (error) {
+          preview.dataset.mathRenderToken = String((Number(preview.dataset.mathRenderToken) || 0) + 1);
+          const expectedCount = Math.max(0, alphabetSpec.chars.length - 1);
+          preview.textContent = `${expectedCount}個の自然数を入力してください`;
+        }
+      }
+
+      function createInitialSubsequenceLanguage(context) {
+        return [[{ kind: 'star', mask: context.fullMask }]];
+      }
+
+      function isSubsequenceMaskSubset(left, right) {
+        return (left & ~right) === 0n;
+      }
+
+      // 現在の言語を変えない簡約だけを行う。
+      // A A*=A* A（同一の文字集合の場合のみ）、A*B*=B*A*=B*（A⊆B）、空集合因子の処理。
+      // 文字集合因子とKleene閉包因子の集合が真に包含関係にあるだけの場合は並べ替えない。
+      function normalizeExactSubsequenceTerm(rawFactors) {
+        const result = [];
+        for (const factor of rawFactors) {
+          if (factor.kind === 'set' && factor.mask === 0n) return null;
+          if (factor.kind === 'star' && factor.mask === 0n) continue;
+          const previous = result[result.length - 1];
+          if (previous && previous.kind === 'set' && factor.kind === 'star'
+              && previous.mask === factor.mask) {
+            result[result.length - 1] = { kind: 'star', mask: factor.mask };
+            result.push({ kind: 'set', mask: factor.mask });
+            continue;
+          }
+          if (previous && previous.kind === 'star' && factor.kind === 'star') {
+            if (isSubsequenceMaskSubset(previous.mask, factor.mask)) {
+              result[result.length - 1] = factor;
+              continue;
+            }
+            if (isSubsequenceMaskSubset(factor.mask, previous.mask)) {
+              continue;
+            }
+          }
+          result.push(factor);
+        }
+        return result;
+      }
+
+      function prependSubsequenceTerms(prefixFactors, terms) {
+        if (!terms.length) return [];
+        if (prefixFactors.some(factor => factor.kind === 'set' && factor.mask === 0n)) return [];
+        const prefix = prefixFactors.filter(factor => !(factor.kind === 'star' && factor.mask === 0n));
+        if (!prefix.length) return terms;
+        const result = [];
+        for (const term of terms) {
+          const normalized = normalizeExactSubsequenceTerm(prefix.concat(term));
+          if (normalized !== null) result.push(normalized);
+        }
+        return result;
+      }
+
+      // ある一つの積項にfree(_,S)を適用する。
+      // 状態(i,j)は、積の第i因子以降と、禁止語Sの第j文字以降を表す。
+      // 依存先が(i,j+1),(i+1,j),(i+1,j+1)だけなので、右下から反復的に計算できる。
+      function freeSubsequenceProduct(factors, patternMasks) {
+        if (factors.some(factor => factor.kind === 'set' && factor.mask === 0n)) return [];
+        const patternLength = patternMasks.length;
+        let nextRow = Array.from({ length: patternLength + 1 }, (_, j) => j < patternLength ? [[]] : []);
+
+        for (let i = factors.length - 1; i >= 0; i--) {
+          const factor = factors[i];
+          const currentRow = Array(patternLength + 1);
+          currentRow[patternLength] = [];
+
+          for (let j = patternLength - 1; j >= 0; j--) {
+            const yMask = patternMasks[j];
+            let result = [];
+
+            if (factor.kind === 'set') {
+              const matched = factor.mask & yMask;
+              const unmatched = factor.mask & ~yMask;
+              if (matched !== 0n) {
+                result = result.concat(prependSubsequenceTerms(
+                  [{ kind: 'set', mask: matched }], nextRow[j + 1]
+                ));
+              }
+              if (unmatched !== 0n) {
+                result = result.concat(prependSubsequenceTerms(
+                  [{ kind: 'set', mask: unmatched }], nextRow[j]
+                ));
+              }
+            } else if (factor.kind === 'star') {
+              const withoutY = factor.mask & ~yMask;
+              const starPrefix = withoutY === 0n ? [] : [{ kind: 'star', mask: withoutY }];
+              if ((factor.mask & yMask) !== 0n) {
+                result = result.concat(prependSubsequenceTerms(
+                  starPrefix.concat([{ kind: 'set', mask: yMask }]), currentRow[j + 1]
+                ));
+              }
+              result = result.concat(prependSubsequenceTerms(
+                starPrefix, nextRow[j]
+              ));
+            } else {
+              throw new Error('未知の正規言語因子が含まれています。');
+            }
+
+            currentRow[j] = result;
+          }
+          nextRow = currentRow;
+        }
+        return nextRow[0];
+      }
+
+      // free(L,S)：LのうちSを部分列として含まない語全体。
+      // 和には各項へ独立に適用し、積項内では上記の動的計画法で⑤・⑥を実行する。
+      function freeSubsequenceLanguage(language, patternMasks) {
+        if (!language.length || !patternMasks.length) return [];
+        const result = [];
+        for (const term of language) {
+          const generated = freeSubsequenceProduct(term, patternMasks);
+          result.push(...generated);
+        }
+        return result;
+      }
+
+      function getSubsequenceTermOrderExponent(rawTerm, alphabetSize) {
+        if (rawTerm.some(factor => factor.kind === 'set' && factor.mask === 0n)) return null;
+        // 枝刈り時の次数判定にも、上界の集計時と同じ正規化を適用する。
+        // 通常文字集合を単元集合へ分配してもKleene閉包因子は変わらず、次数は全展開項で共通なので、
+        // ここでは展開を実体化せず、正規化済み因子から直接次数を読む。
+        const term = normalizeSubsequenceTermForUpperBound(rawTerm);
+        const exponent = Array(alphabetSize).fill(0n);
+        for (const factor of term) {
+          const size = bitCountBigInt(factor.mask);
+          if (factor.kind === 'star' && size > 0) exponent[alphabetSize - size] += 1n;
+        }
+        return exponent;
+      }
+
+      function isSubsequenceExponentBelow(left, right) {
+        for (let index = 0; index < left.length; index++) {
+          if (left[index] < right[index]) return true;
+          if (left[index] > right[index]) return false;
+        }
+        return false;
+      }
+
+      // 積項の順序型の次数が閾値未満なら捨てる。捨てた部分全体はω^α未満で抑える。
+      function pruneSubsequenceLanguage(language, context) {
+        if (!context.pruningThreshold) return { language, pruned: false };
+        const kept = [];
+        let pruned = false;
+        for (const term of language) {
+          const exponent = getSubsequenceTermOrderExponent(term, context.characters.length);
+          if (exponent && isSubsequenceExponentBelow(exponent, context.pruningThreshold)) {
+            pruned = true;
+          } else {
+            kept.push(term);
+          }
+        }
+        return { language: kept, pruned };
+      }
+
+      function compareOrdinalExponentVectors(left, right) {
+        for (let i = 0; i < left.length; i++) {
+          if (left[i] > right[i]) return -1;
+          if (left[i] < right[i]) return 1;
+        }
+        return 0;
+      }
+
+      function formatSubsequenceExponent(coefficients) {
+        const tex = [];
+        const plain = [];
+        const dimension = coefficients.length;
+        for (let index = 0; index < dimension; index++) {
+          const coefficient = coefficients[index];
+          if (coefficient === 0n) continue;
+          const degree = dimension - index - 1;
+          if (degree === 0) {
+            tex.push(coefficient.toString());
+            plain.push(coefficient.toString());
+          } else {
+            const baseTex = degree === 1 ? '\\omega' : `\\omega^{${degree}}`;
+            const basePlain = degree === 1 ? 'ω' : `ω^${degree}`;
+            tex.push(coefficient === 1n ? baseTex : `${baseTex}\\cdot ${coefficient}`);
+            plain.push(coefficient === 1n ? basePlain : `${basePlain}·${coefficient}`);
+          }
+        }
+        return { tex: tex.join(' + ') || '0', plain: plain.join(' + ') || '0' };
+      }
+
+      // 順序型の上界を計算するときだけ使う正規化。
+      // 正規言語そのもの（freeの入力）には適用しない。
+      // 1. 既存の言語同値な簡約を行う。
+      // 2. 文字集合Aの因子について、直前・直後のKleene閉包に含まれる文字をAから除く。
+      // 3. Aが空になれば削除し、その結果隣接したKleene閉包も包含関係で統合する。
+      // 2と3で新たな隣接が生じることがあるため、変化がなくなるまで繰り返す。
+      function normalizeSubsequenceTermForUpperBound(rawFactors) {
+        const initiallyNormalized = normalizeExactSubsequenceTerm(rawFactors);
+        if (initiallyNormalized === null) return [];
+        let factors = initiallyNormalized;
+
+        while (true) {
+          let changed = false;
+          const withoutCoveredSetCharacters = [];
+
+          for (let index = 0; index < factors.length; index++) {
+            const factor = factors[index];
+            if (factor.kind !== 'set') {
+              withoutCoveredSetCharacters.push(factor);
+              continue;
+            }
+
+            let mask = factor.mask;
+            const previous = factors[index - 1];
+            const next = factors[index + 1];
+            if (previous && previous.kind === 'star') mask &= ~previous.mask;
+            if (next && next.kind === 'star') mask &= ~next.mask;
+
+            if (mask !== factor.mask) changed = true;
+            if (mask === 0n) {
+              changed = true;
+              continue;
+            }
+            withoutCoveredSetCharacters.push(mask === factor.mask
+              ? factor
+              : { kind: 'set', mask });
+          }
+
+          const mergedAdjacentStars = [];
+          for (const factor of withoutCoveredSetCharacters) {
+            const previous = mergedAdjacentStars[mergedAdjacentStars.length - 1];
+            if (previous && previous.kind === 'star' && factor.kind === 'star') {
+              if (isSubsequenceMaskSubset(previous.mask, factor.mask)) {
+                mergedAdjacentStars[mergedAdjacentStars.length - 1] = factor;
+                changed = true;
+                continue;
+              }
+              if (isSubsequenceMaskSubset(factor.mask, previous.mask)) {
+                changed = true;
+                continue;
+              }
+            }
+            mergedAdjacentStars.push(factor);
+          }
+
+          factors = mergedAdjacentStars;
+          if (!changed) return factors;
+        }
+      }
+
+      // 順序型計算専用：通常の文字集合因子を単元集合に分配する。
+      // 生成結果は遅延列挙し、積項の直積サイズに比例した配列を一度に作らない。
+      // 正規言語そのもの（freeの入力）には適用しない。
+      function* expandSubsequenceTermForOrderType(rawFactors) {
+        if (rawFactors.some(factor => factor.kind === 'set' && factor.mask === 0n)) return;
+        const normalized = normalizeSubsequenceTermForUpperBound(rawFactors);
+
+        function* expandAt(index, prefix) {
+          if (index >= normalized.length) {
+            yield prefix;
+            return;
+          }
+          const factor = normalized[index];
+          if (factor.kind === 'star') {
+            yield* expandAt(index + 1, prefix.concat({ kind: 'star', mask: factor.mask }));
+            return;
+          }
+          // set因子は、その集合の各文字を表す単元集合因子に分配する。
+          for (let remaining = factor.mask; remaining !== 0n; remaining &= (remaining - 1n)) {
+            const bit = remaining & -remaining;
+            yield* expandAt(index + 1, prefix.concat({ kind: 'set', mask: bit }));
+          }
+        }
+
+        yield* expandAt(0, []);
+      }
+
+      // 積項の上界ω^α·cを求め、和の上界を自然和でまとめる。
+      // 通常文字集合を単元集合に分配した後、因子列が完全一致する積項だけを一度数える。
+      // 最高次項の次数・係数は正確なので、それを下限としても表示する。
+      // 計算短縮時は枝刈り後の言語が元の言語の部分言語であるため、
+      // 枝刈り後の計算結果の最高次項を元の言語の下限として使える。
+      function formatSubsequenceOrderTypeTerm(term) {
+        const alpha = formatSubsequenceExponent(term.exponent);
+        const isZeroExponent = term.exponent.every(value => value === 0n);
+        if (isZeroExponent) {
+          return { tex: term.coefficient.toString(), plain: term.coefficient.toString() };
+        }
+        const exponentIsOne = term.exponent[term.exponent.length - 1] === 1n
+          && term.exponent.slice(0, -1).every(value => value === 0n);
+        const outerTex = exponentIsOne ? '\\omega' : `\\omega^{${alpha.tex}}`;
+        const outerPlain = exponentIsOne ? 'ω' : `ω^(${alpha.plain})`;
+        return {
+          tex: `${outerTex}${term.coefficient === 1n ? '' : `\\cdot ${term.coefficient}`}`,
+          plain: `${outerPlain}${term.coefficient === 1n ? '' : `·${term.coefficient}`}`
+        };
+      }
+
+      function formatSubsequenceOrderTypeTerms(terms) {
+        const formatted = terms.map(formatSubsequenceOrderTypeTerm);
+        return {
+          tex: formatted.map(term => term.tex).join(' + ') || '0',
+          plain: formatted.map(term => term.plain).join(' + ') || '0'
+        };
+      }
+
+      function computeSubsequenceOrderTypeUpperBound(language, alphabetSize, correctionExponent = null) {
+        const grouped = new Map();
+        const seenExpandedTerms = new Set();
+        for (const rawTerm of language) {
+          // 文字集合因子を単元集合に分配してから完全一致を判定する。
+          // 例えば {0,1}A* と {0}A* + {1}A* は、同じ2つの積項として集計される。
+          for (const term of expandSubsequenceTermForOrderType(rawTerm)) {
+            // 因子の順序・種類・文字集合maskがすべて一致する項だけを重複排除する。
+            // 文字集合の要素数だけで異なる集合を同一視することはしない。
+            const expandedTermKey = term.map(factor => `${factor.kind}:${factor.mask.toString()}`).join('|');
+            if (seenExpandedTerms.has(expandedTermKey)) continue;
+            seenExpandedTerms.add(expandedTermKey);
+
+            // set因子はすべて単元集合なので係数は1。Kleene閉包因子から指数を集計する。
+            const exponent = Array(alphabetSize).fill(0n);
+            let emptyProduct = false;
+            for (const factor of term) {
+              const size = bitCountBigInt(factor.mask);
+              if (factor.kind === 'set') {
+                if (size === 0) { emptyProduct = true; break; }
+              } else if (factor.kind === 'star') {
+                if (size > 0) exponent[alphabetSize - size] += 1n;
+              }
+            }
+            if (emptyProduct) continue;
+            const key = exponent.join(',');
+            const current = grouped.get(key);
+            if (current) current.coefficient += 1n;
+            else grouped.set(key, { exponent, coefficient: 1n });
+          }
+        }
+
+        // 補正項を加える前の値を複製する。こちらの最高次項が下限になる。
+        const baseTerms = [...grouped.values()]
+          .map(term => ({ exponent: term.exponent.slice(), coefficient: term.coefficient }))
+          .sort((a, b) => compareOrdinalExponentVectors(a.exponent, b.exponent));
+
+        // 枝刈りした部分はω^α未満なので、上界にはω^αを自然和で一度加える。
+        // 既存項と同じ次数なら、その係数に加算する。
+        if (correctionExponent) {
+          const key = correctionExponent.join(',');
+          const current = grouped.get(key);
+          if (current) current.coefficient += 1n;
+          else grouped.set(key, { exponent: correctionExponent.slice(), coefficient: 1n });
+        }
+        const upperTerms = [...grouped.values()]
+          .sort((a, b) => compareOrdinalExponentVectors(a.exponent, b.exponent));
+        const upper = formatSubsequenceOrderTypeTerms(upperTerms);
+        const leadingTerm = baseTerms[0] || null;
+        const lower = leadingTerm
+          ? formatSubsequenceOrderTypeTerm(leadingTerm)
+          : { tex: '0', plain: '0' };
+
+        // 補正なしで項が高々1つなら上下限が一致し、厳密値が確定する。
+        const exact = !correctionExponent && baseTerms.length <= 1;
+        if (exact) {
+          return {
+            tex: `o(D) = ${upper.tex}`,
+            plain: `o(D) = ${upper.plain}`,
+            exact: true,
+            termCount: seenExpandedTerms.size,
+            correctionApplied: false
+          };
+        }
+
+        const upperRelationTex = correctionExponent ? '<' : '\\leq';
+        const upperRelationPlain = correctionExponent ? '<' : '≤';
+        return {
+          tex: `${lower.tex}\\leq o(D)${upperRelationTex} ${upper.tex}`,
+          plain: `${lower.plain} ≤ o(D) ${upperRelationPlain} ${upper.plain}`,
+          exact: false,
+          termCount: seenExpandedTerms.size,
+          correctionApplied: Boolean(correctionExponent)
+        };
+      }
+
+      function addSubsequenceWordToLanguage(entry, context) {
+        try {
+          const patternMasks = entry.units.map(unit => {
+            const index = context.indexMap.get(unit);
+            if (index === undefined) throw new Error(`文字「${unit}」が順序型計算用の文字集合にありません。`);
+            return 1n << BigInt(index);
+          });
+          const generatedLanguage = freeSubsequenceLanguage(state.subsequenceLanguage, patternMasks);
+          const pruned = pruneSubsequenceLanguage(generatedLanguage, context);
+          const nextLanguage = pruned.language;
+          const pruningOccurred = state.subsequencePruningOccurred || pruned.pruned;
+          const correctionExponent = pruningOccurred ? context.pruningThreshold : null;
+          const upperBound = computeSubsequenceOrderTypeUpperBound(
+            nextLanguage, context.characters.length, correctionExponent
+          );
+          entry.subsequenceLanguageBefore = state.subsequenceLanguage;
+          entry.subsequencePruningOccurredBefore = state.subsequencePruningOccurred;
+          entry.subsequenceOrderTypeUpperBound = upperBound;
+          state.subsequenceLanguage = nextLanguage;
+          state.subsequencePruningOccurred = pruningOccurred;
+        } catch (error) {
+          state.orderTypeCalculationStopped = true;
+          state.orderTypeStopReason = `部分列の順序型計算中にエラーが発生したため、計算を停止しました（${error.message}）。このゲーム中は再開できません。`;
+          for (const oldEntry of state.words) delete oldEntry.subsequenceLanguageBefore;
+          state.subsequenceLanguage = null;
+          state.subsequenceOrderContext = null;
+          state.subsequencePruningOccurred = false;
+        }
+      }
+
       // 各単語の比較用データは登録時に一度だけ作る。設定は対局中固定される。
       function prepareComparisonData(memo, rules, gapInfo = null) {
         // かなモードだけ小文字の結合設定を反映する。それ以外はコードポイント単位で厳密に比較する。
@@ -1725,6 +2216,7 @@
         }
         const remainingLabel = $('showRemainingTurnsLabel');
         const remainingHelp = $('showRemainingTurnsHelp');
+        remainingHelp.hidden = false;
         if (rules.ending === 'last') {
           remainingLabel.textContent = '残りのターン数を表示する';
           remainingHelp.textContent = '末尾文字一致禁止で、文字集合の要素数から現在のターン番号を引いた残りターン数を表示します。';
@@ -1733,18 +2225,27 @@
           remainingHelp.textContent = '既出の使用文字集合から、残りの極大順序型を計算します。';
         } else if (rules.ending === 'commutative') {
           remainingLabel.textContent = '残りの極大順序型の上界を表示する';
-          remainingHelp.textContent = '各文字の出現数ベクトルから上界を計算します。上位2係数は厳密値で、下位の項が残る場合は上下限を表示します。計算には時間がかかる場合があります。';
+          remainingHelp.textContent = '';
+          remainingHelp.hidden = true;
+        } else if (rules.ending === 'subsequence') {
+          remainingLabel.textContent = '残りの極大順序型の上界を表示する';
+          remainingHelp.textContent = '';
+          remainingHelp.hidden = true;
         } else {
           remainingLabel.textContent = '残りのターン数・極大順序型を表示する';
           remainingHelp.textContent = '末尾文字一致禁止では残りターン数、使用文字包含禁止では残りの極大順序型、可換部分列禁止ではその上界を表示します。';
         }
+        const subsequenceOrderTypeApplicable = rules.ending === 'subsequence';
+        $('subsequenceShorteningField').hidden = !subsequenceOrderTypeApplicable;
         const orderTypeKanaHelp = rules.characterSet === 'hiragana'
-          && ['alphabet', 'commutative'].includes(rules.ending)
+          && (['alphabet', 'commutative'].includes(rules.ending) || subsequenceOrderTypeApplicable)
           ? ' ひらがなの順序型計算では清音の基本文字のみを使い、小書き文字・伸ばし棒・濁点／半濁点付き文字は文字集合に含めません。正規化後にこれらが残る入力は使用できません。'
           : '';
-        if (['alphabet', 'commutative'].includes(rules.ending)) remainingHelp.textContent += orderTypeKanaHelp;
-        $('remainingOrderField').hidden = !['last', 'alphabet', 'commutative'].includes(rules.ending);
-        $('orderTypeDisclaimer').hidden = !['alphabet', 'commutative'].includes(rules.ending);
+        if (['alphabet', 'commutative'].includes(rules.ending) || subsequenceOrderTypeApplicable) remainingHelp.textContent += orderTypeKanaHelp;
+        const remainingApplicable = ['last', 'alphabet', 'commutative'].includes(rules.ending) || subsequenceOrderTypeApplicable;
+        $('remainingOrderField').hidden = !remainingApplicable;
+        $('orderTypeDisclaimer').hidden = !(['alphabet', 'commutative'].includes(rules.ending) || subsequenceOrderTypeApplicable);
+        updateSubsequenceShorteningPreview();
         describeConstraintFunctions();
       }
 
@@ -1752,6 +2253,8 @@
         if (!target) return;
         // 各ターンで計算済みの値・順序数上界を数式として描画する。
         const value = String(formula);
+        const renderToken = String((Number(target.dataset.mathRenderToken) || 0) + 1);
+        target.dataset.mathRenderToken = renderToken;
         target.textContent = fallbackText === null ? value : fallbackText;
         target.setAttribute('aria-label', `${description}${fallbackText === null ? value : fallbackText}`);
         const mathJax = window.MathJax;
@@ -1762,7 +2265,9 @@
         ready
           .then(() => mathJax.tex2chtmlPromise(value))
           .then(rendered => {
-            if (target.isConnected) target.replaceChildren(rendered);
+            if (target.isConnected && target.dataset.mathRenderToken === renderToken) {
+              target.replaceChildren(rendered);
+            }
           })
           .catch(() => { /* Keep the plain-text fallback if typesetting fails. */ });
       }
@@ -1811,6 +2316,14 @@
             remainingFormula = formatted.tex;
             remainingFallback = formatted.plain;
             remainingDescription = formatted.exact ? '残りの極大順序型' : '残りの極大順序型の上下限';
+          } else if (rules.ending === 'subsequence'
+              && entry.subsequenceOrderTypeUpperBound
+              && typeof entry.subsequenceOrderTypeUpperBound.tex === 'string') {
+            remainingFormula = entry.subsequenceOrderTypeUpperBound.tex;
+            remainingFallback = entry.subsequenceOrderTypeUpperBound.plain;
+            remainingDescription = entry.subsequenceOrderTypeUpperBound.exact
+              ? '残りの極大順序型'
+              : '残りの極大順序型の上下限';
           }
           if (remainingFormula !== null) {
             remaining = document.createElement('span');
@@ -3332,8 +3845,12 @@
           $(id).disabled = settingsLocked || (kanaOnly && characterSet !== 'hiragana') || (customOnly && characterSet !== 'custom');
         });
         const remainingRule = $('endingRule').value;
-        const remainingCounterApplicable = ['last', 'alphabet', 'commutative'].includes(remainingRule);
+        const subsequenceOrderApplicable = remainingRule === 'subsequence';
+        const remainingCounterApplicable = ['last', 'alphabet', 'commutative'].includes(remainingRule) || subsequenceOrderApplicable;
         $('showRemainingTurns').disabled = settingsLocked || !remainingCounterApplicable;
+        $('enableSubsequenceShortening').disabled = settingsLocked || !subsequenceOrderApplicable || !$('showRemainingTurns').checked;
+        $('subsequenceShorteningThreshold').disabled = settingsLocked || !subsequenceOrderApplicable
+          || !$('showRemainingTurns').checked || !$('enableSubsequenceShortening').checked;
         $('nRule').disabled = settingsLocked || characterSet === 'latin' || characterSet === 'digits';
         $('reciprocalRule').disabled = settingsLocked || !reciprocalApplicable.has($('endingRule').value);
         $('playerCountSetting').disabled = settingsLocked;
@@ -3468,10 +3985,11 @@
         }
         $('undoButton').disabled = state.history.length === 0;
         const orderTypeCalculationConfigured = state.started
-          && ['alphabet', 'commutative'].includes(remainingRule)
+          && (['alphabet', 'commutative'].includes(remainingRule) || subsequenceOrderApplicable)
           && $('showRemainingTurns').checked;
         $('stopAlphabetOrderTypeButton').hidden = !orderTypeCalculationConfigured || state.orderTypeCalculationStopped;
         $('orderTypeCalculationStoppedNote').hidden = !orderTypeCalculationConfigured || !state.orderTypeCalculationStopped;
+        $('orderTypeCalculationStoppedNote').textContent = state.orderTypeStopReason || '順序型の計算は停止しました。このゲーム中は再開できません。';
         syncConnectionInput();
         const foulCount = state.history.filter(entry => entry.foul).length;
         $('historyCount').textContent = `${state.words.length} 有効ターン · ${foulCount} 反則`;
@@ -3529,6 +4047,16 @@
           const spec = classifyCustomAlphabet(rules.customAlphabet);
           if (!spec.valid) { feedback(spec.message); return false; }
         }
+        if (rules.ending === 'subsequence' && rules.showRemainingTurns && rules.enableSubsequenceShortening) {
+          const alphabetSpec = getOrderTypeAlphabetSpec(rules);
+          if (!alphabetSpec.valid) { feedback(alphabetSpec.message || '文字集合を確認してください。'); return false; }
+          try {
+            parseSubsequencePruningThreshold(rules.subsequenceShorteningThreshold, alphabetSpec.chars.length);
+          } catch (error) {
+            feedback(`計算の短縮の設定を確認してください：${error.message}`);
+            return false;
+          }
+        }
         if (isGapRule(rules.ending)) {
           const gapInfo = getGapOrderInfo(rules, rules.characterSet === 'custom' ? classifyCustomAlphabet(rules.customAlphabet) : null);
           if (!gapInfo.valid) { feedback(gapInfo.message); return false; }
@@ -3548,17 +4076,29 @@
         state.alphabetOrderContext = null;
         state.commutativeFamily = [];
         state.commutativeOrderContext = null;
+        state.subsequenceLanguage = null;
+        state.subsequenceOrderContext = null;
+        state.subsequencePruningOccurred = false;
         state.orderTypeCalculationStopped = false;
+        state.orderTypeStopReason = '';
         const startRules = currentRules();
         const trackAlphabetOrder = shouldTrackAlphabetOrderType(startRules);
         const trackCommutativeOrder = shouldTrackCommutativeOrderBound(startRules);
-        if (trackAlphabetOrder || trackCommutativeOrder) {
+        const trackSubsequenceOrder = shouldTrackSubsequenceOrderType(startRules);
+        if (trackAlphabetOrder || trackCommutativeOrder || trackSubsequenceOrder) {
           const orderTypeAlphabet = getOrderTypeAlphabetSpec(startRules);
           if (trackAlphabetOrder && orderTypeAlphabet.valid) {
             state.alphabetOrderContext = createAlphabetOrderContext(orderTypeAlphabet);
           }
           if (trackCommutativeOrder && orderTypeAlphabet.valid) {
             state.commutativeOrderContext = createCommutativeOrderContext(orderTypeAlphabet);
+          }
+          if (trackSubsequenceOrder && orderTypeAlphabet.valid) {
+            const pruningThreshold = startRules.enableSubsequenceShortening
+              ? parseSubsequencePruningThreshold(startRules.subsequenceShorteningThreshold, orderTypeAlphabet.chars.length)
+              : null;
+            state.subsequenceOrderContext = createSubsequenceOrderContext(orderTypeAlphabet, pruningThreshold);
+            state.subsequenceLanguage = createInitialSubsequenceLanguage(state.subsequenceOrderContext);
           }
         }
         state.started = true;
@@ -3664,9 +4204,10 @@
           }
         }
         comparisonData = prepareComparisonData(memo, rules, gapInfo);
-        if (rules.showRemainingTurns
-            && (rules.ending === 'last' || !state.orderTypeCalculationStopped)
-            && ['last', 'alphabet', 'commutative'].includes(rules.ending)) {
+        const orderTypeAlphabetValidationApplies = rules.showRemainingTurns
+          && (rules.ending === 'last' || !state.orderTypeCalculationStopped)
+          && (['last', 'alphabet', 'commutative'].includes(rules.ending) || shouldTrackSubsequenceOrderType(rules));
+        if (orderTypeAlphabetValidationApplies) {
           const alphabetSpec = getOrderTypeAlphabetSpec(rules);
           if (alphabetSpec.valid) {
             const allowedUnits = new Set(alphabetSpec.chars);
@@ -3769,6 +4310,9 @@
         if (shouldTrackCommutativeOrderBound(rules) && state.commutativeOrderContext && entry.unitCounts) {
           addCommutativeVectorToFamily(entry, state.commutativeOrderContext);
         }
+        if (shouldTrackSubsequenceOrderType(rules) && state.subsequenceOrderContext && state.subsequenceLanguage) {
+          addSubsequenceWordToLanguage(entry, state.subsequenceOrderContext);
+        }
         state.words.push(entry);
         state.history.push(entry);
         state.playerCounts[player]++;
@@ -3825,22 +4369,27 @@
       $('stopAlphabetOrderTypeButton').addEventListener('click', () => {
         const rules = currentRules();
         if (!state.started || state.orderTypeCalculationStopped
-            || !['alphabet', 'commutative'].includes(rules.ending)
+            || !(['alphabet', 'commutative'].includes(rules.ending) || (rules.ending === 'subsequence'))
             || !rules.showRemainingTurns) return;
         if (!window.confirm('再度計算し直すことはできません。本当によろしいですか？')) return;
 
         // 既に表示した値は履歴に残し、以後のターンでは集合族の更新・計算を一切行わない。
         state.orderTypeCalculationStopped = true;
+        state.orderTypeStopReason = '順序型の計算を停止しました。このゲーム中は再開できません。';
         for (const entry of state.words) {
           entry.alphabetFamilyChange = null;
           entry.commutativeFamilyChange = null;
           delete entry.alphabetMask;
           delete entry.commutativeVector;
+          delete entry.subsequenceLanguageBefore;
         }
         state.alphabetFamily = [];
         state.alphabetOrderContext = null;
         state.commutativeFamily = [];
         state.commutativeOrderContext = null;
+        state.subsequenceLanguage = null;
+        state.subsequenceOrderContext = null;
+        state.subsequencePruningOccurred = false;
         render();
         feedback('順序型の計算を停止しました。これ以降は計算しません。', 'success');
       });
@@ -3863,6 +4412,15 @@
           }
           if (validRemoved && validRemoved.commutativeFamilyChange && state.commutativeOrderContext) {
             undoCommutativeVectorFromFamily(validRemoved);
+          }
+          if (validRemoved && Object.prototype.hasOwnProperty.call(validRemoved, 'subsequenceLanguageBefore')
+              && state.subsequenceOrderContext) {
+            state.subsequenceLanguage = validRemoved.subsequenceLanguageBefore;
+            delete validRemoved.subsequenceLanguageBefore;
+            if (Object.prototype.hasOwnProperty.call(validRemoved, 'subsequencePruningOccurredBefore')) {
+              state.subsequencePruningOccurred = validRemoved.subsequencePruningOccurredBefore;
+              delete validRemoved.subsequencePruningOccurredBefore;
+            }
           }
           releaseEntryCache(validRemoved);
           if (validRemoved && validRemoved.indexed && state.fastLookup.get(validRemoved.indexKey) === validRemoved) {
@@ -3901,7 +4459,11 @@
         state.alphabetOrderContext = null;
         state.commutativeFamily = [];
         state.commutativeOrderContext = null;
+        state.subsequenceLanguage = null;
+        state.subsequenceOrderContext = null;
+        state.subsequencePruningOccurred = false;
         state.orderTypeCalculationStopped = false;
+        state.orderTypeStopReason = '';
         state.demoAlphabetSequence = null;
         state.demoCommutativeSequence = null;
         state.playerCounts = Array(state.playerNames.length).fill(0);
@@ -3932,6 +4494,7 @@
           : 'お手本モードで禁止条件の判定を省略します。');
       });
       $('customAlphabet').addEventListener('input', () => describeRules());
+      $('subsequenceShorteningThreshold').addEventListener('input', updateSubsequenceShorteningPreview);
       ['minLengthFunction', 'maxLengthFunction', 'joinLengthFunction'].forEach(id => {
         $(id).addEventListener('input', () => describeConstraintFunctions());
       });
