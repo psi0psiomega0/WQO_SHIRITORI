@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f5f1e9">
-  <title>ことばをつなごう — 文字列ゲーム</title>
+  <title>悪いしりとり</title>
   <script>
     window.MathJax = {
       tex: { inlineMath: [['\\(', '\\)']] },
@@ -153,6 +153,23 @@
     .end-title { margin: 0 0 5px; color: #895531; font-size: 18px; font-weight: 800; }
     .end-detail { margin: 0; color: #806f60; font-size: 13px; white-space: pre-line; line-height: 1.8; }
     .toolbar { display: flex; flex-wrap: wrap; justify-content: center; gap: 9px; margin-top: 5px; }
+    .rewind-button { border-color: #8a9caf; color: #526a84; }
+    .rewind-button:hover:not(:disabled) { border-color: #6d87a4; background: #f2f6fa; }
+    .rewind-panel { width: min(570px, 100%); margin: 14px auto 0; padding: 17px; border: 1px solid #ccd7e1; border-radius: 14px; background: #f7fafc; }
+    .rewind-panel[hidden] { display: none !important; }
+    .rewind-panel-title { margin: 0 0 5px; color: #445c74; text-align: center; font-size: 15px; font-weight: 800; }
+    .rewind-panel-help { margin: 0 0 12px; color: #6f7f8d; text-align: center; font-size: 12px; line-height: 1.75; }
+    .rewind-input-row { display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .rewind-turn-input { width: 112px; height: 40px; padding: 0 10px; border: 1px solid #cbd5df; border-radius: 9px; color: var(--ink); background: white; font-size: 16px; text-align: center; }
+    .rewind-range-note { min-height: 18px; margin: 7px 0 0; color: #8a969f; text-align: center; font-size: 11px; }
+    .rewind-error { min-height: 18px; margin: 2px 0 0; color: var(--red); text-align: center; font-size: 11px; }
+    .rewind-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 10px; }
+    .rewind-confirm-button { border-color: #607d99; color: white; background: #607d99; font-weight: 750; }
+    .rewind-confirm-button:hover:not(:disabled) { border-color: #4b657e; background: #4b657e; }
+    .rewind-cancel-button { border-color: #d3d5d0; color: #777e77; background: white; }
+    .history-item.rewind-selectable { cursor: pointer; }
+    .history-item.rewind-selectable:hover { border-color: #9aafc3; background: #f4f8fb; }
+    .history-item.selected-for-rewind { border-color: #607d99; box-shadow: 0 0 0 2px rgba(96,125,153,.17); }
     .stop-order-type-button { border-color: #d8b49a; color: #96603a; }
     .stop-order-type-button:hover:not(:disabled) { border-color: #c38b66; background: #fff7f0; }
     .order-type-stopped-note { margin: 9px 0 0; color: #9a7658; text-align: center; font-size: 11px; }
@@ -213,9 +230,11 @@
 <body>
   <div class="page">
     <header>
-      <div class="eyebrow">WORD STRING GAME</div>
-      <h1>ことばをつなごう</h1>
-      <p class="subtitle">お手本生成・1人プレイ・最大10人対戦に対応する文字列ゲーム</p>
+      <div class="eyebrow">BAD SEQUENCE SHIRITORI GAME</div>
+      <h1>悪いしりとり</h1>
+      <p class="subtitle">既に出た文字列を部分列にもたないように文字列を並べよう！</p>
+      <p class="subtitle">お手本プレイ・1人プレイ・最大10人対戦ができたり色んな文字列上の関係で遊べます。</p>
+
     </header>
 
     <noscript><p style="padding:14px; border:1px solid #d9a29b; border-radius:12px; background:#fff4f1; color:#8b3d36; text-align:center;">このしりとりを遊ぶにはJavaScriptが必要です。ファイルをダウンロードし、SafariやChromeなどのブラウザで開いてください。</p></noscript>
@@ -225,7 +244,7 @@
         <label for="playerCountSetting">参加人数
           <select id="playerCountSetting">
             <option value="0">0人（お手本モード）</option>
-            <option value="1">1人（ソロチャレンジ）</option>
+            <option value="1">1人（とことんモード）</option>
             <option value="2" selected>2人</option>
             <option value="3">3人</option><option value="4">4人</option><option value="5">5人</option>
             <option value="6">6人</option><option value="7">7人</option><option value="8">8人</option>
@@ -388,10 +407,11 @@
               <span class="setting-label">隣接文字列の接続文字数 f(i)</span>
               <input class="rule-select function-input" id="joinLengthFunction" type="text" inputmode="text" autocomplete="off" spellcheck="false" value="1" placeholder="0：接続制限なし">
               <p class="setting-help">第iターン目（i≧2）の先頭と、第i−1ターン目の末尾で一致させる文字数。例：0、1、2、i</p>
+              <p class="setting-help">1を入力すると普通のしりとり、2を入力すると2文字とり、0を入力すると単に悪列を宣言するゲームになります。</p>
             </label>
           </div>
           <div class="function-preview" id="functionPreview">iは1始まりのターン番号です。下限・上限は実数値で計算した後、それぞれfloorで整数化します。f(1)は使わず、f(i)は第i−1ターン目と第iターン目の間（i≧2）に適用します。</div>
-          <p class="setting-help" style="margin-top:8px">式では i、+ − * / ^、小数、括弧、min、max、abs、floor、ceil、sqrt、exp(a,b)、log(a,b)、root(a,n)、slog(a) を使用できます。exp(a,b)=a^b、log(a,b)=log_a(b)、root(a,n)=aのn乗根です。slogは底2の連続反復対数で、0≤x<1ではx−1、x≥1では1+slog(log₂x)とします。長さの下限・上限と接続文字数は、実数計算後にfloorで整数化します。式は安全な数式として解析し、JavaScriptコードとしては実行しません。</p>
+          <p class="setting-help" style="margin-top:8px">式では i、+ − * / ^、小数、括弧、min、max、abs、floor、ceil、sqrt、exp(a,b)、log(a,b)、root(a,n)、slog(a) を使用できます。exp(a,b)=a^b、log(a,b)=log_a(b)、root(a,n)=aのn乗根です。slogは底2のテトレーションの逆関数を連続化した関数で、0≤x<1ではx−1、x≥1では1+slog(log₂x)とします。長さの下限・上限と接続文字数は、実数計算後にfloorで整数化します。式は安全な数式として解析し、JavaScriptコードとしては実行しません。</p>
           <p class="setting-help">例：下限と上限をどちらも <code>i+1</code>、接続文字数を <code>i</code> にすると、第iターン目はi+1文字で、前ターンの末尾i文字と接続します。</p>
         </section>
 
@@ -448,14 +468,30 @@
         <div class="toolbar">
           <button class="sub-button" id="undoButton" type="button" disabled>↶ ひとつ戻す</button>
           <button class="sub-button" id="resetButton" type="button">最初からやり直す</button>
+          <button class="sub-button rewind-button" id="rewindButton" type="button" disabled>指定したターンまで戻す</button>
           <button class="sub-button stop-order-type-button" id="stopAlphabetOrderTypeButton" type="button" hidden>順序型の計算をやめる</button>
         </div>
+        <section class="rewind-panel" id="rewindPanel" hidden aria-labelledby="rewindPanelTitle">
+          <h3 class="rewind-panel-title" id="rewindPanelTitle">何ターン目まで戻しますか？</h3>
+          <p class="rewind-panel-help">ターン数を入力すると、そのターンまで戻ります。下のゲーム履歴をクリックすると、そのターンが入力されます。</p>
+          <div class="rewind-input-row">
+            <label for="rewindTurnInput">第</label>
+            <input class="rewind-turn-input" id="rewindTurnInput" type="number" min="1" step="1" inputmode="numeric" autocomplete="off">
+            <span>ターン目</span>
+          </div>
+          <p class="rewind-range-note" id="rewindRangeNote"></p>
+          <p class="rewind-error" id="rewindError" role="status" aria-live="polite"></p>
+          <div class="rewind-actions">
+            <button class="sub-button rewind-confirm-button" id="rewindConfirmButton" type="button" disabled>このターンに戻る</button>
+            <button class="sub-button rewind-cancel-button" id="rewindCancelButton" type="button">やめとく</button>
+          </div>
+        </section>
         <p class="order-type-stopped-note" id="orderTypeCalculationStoppedNote" hidden>順序型の計算は停止しました。このゲーム中は再開できません。</p>
       </section>
 
       <section class="history-section">
         <div class="history-head">
-          <h2 class="history-title">ことばの記録</h2>
+          <h2 class="history-title">ゲームの履歴</h2>
           <div class="history-tools">
             <span class="history-count" id="historyCount">0 WORDS</span>
             <button class="sub-button history-save-button" id="downloadGameSaveButton" type="button" disabled>履歴を保存</button>
@@ -2500,6 +2536,21 @@
           .catch(() => { /* Keep the plain-text fallback if typesetting fails. */ });
       }
 
+      function setHistoryItemRewindSelectable(item, enabled) {
+        if (enabled) {
+          item.classList.add('rewind-selectable');
+          item.setAttribute('role', 'button');
+          item.setAttribute('tabindex', '0');
+        } else {
+          item.classList.remove('rewind-selectable', 'selected-for-rewind');
+          item.removeAttribute('role');
+          item.removeAttribute('tabindex');
+          item.removeAttribute('aria-label');
+        }
+      }
+      function setHistoryItemsRewindSelectable(enabled) {
+        $('historyList').querySelectorAll('.history-item').forEach(item => setHistoryItemRewindSelectable(item, enabled));
+      }
       function showEmptyHistory() {
         const empty = document.createElement('span');
         empty.className = 'empty-history';
@@ -2576,7 +2627,25 @@
         item.append(number, word);
         if (remaining) item.append(remaining);
         item.append(owner);
+        const selectRewindTurn = () => {
+          if ($('rewindPanel').hidden) return;
+          $('rewindTurnInput').value = String(entry.turnIndex);
+          $('historyList').querySelectorAll('.history-item').forEach(node => node.classList.remove('selected-for-rewind'));
+          item.classList.add('selected-for-rewind');
+          updateRewindPanelValidity();
+        };
+        item.addEventListener('click', selectRewindTurn);
+        item.addEventListener('keydown', event => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            selectRewindTurn();
+          }
+        });
         list.append(item);
+        if (!$('rewindPanel').hidden) {
+          setHistoryItemRewindSelectable(item, true);
+          item.setAttribute('aria-label', `第${entry.turnIndex}ターンからやり直す位置に指定`);
+        }
         if (remaining) renderRemainingTurnsMath(
           remaining.querySelector('.remaining-math'), remainingFormula, remainingDescription, remainingFallback
         );
@@ -2585,6 +2654,124 @@
         const list = $('historyList');
         if (list.lastElementChild) list.lastElementChild.remove();
         if (!state.history.length) showEmptyHistory();
+      }
+      function getMaximumRewindTurn() {
+        if (!state.started) return 0;
+        // 対局中は現在の手番より前まで。終了時は最後の反則が起きた手番からの再開も許可する。
+        return state.finished ? state.words.length + 1 : state.words.length;
+      }
+      function updateRewindPanelValidity() {
+        const input = $('rewindTurnInput');
+        if (!input) return;
+        const maxTurn = getMaximumRewindTurn();
+        input.min = '1';
+        input.max = String(Math.max(0, maxTurn));
+        $('rewindRangeNote').textContent = maxTurn >= 1
+          ? `入力できるターン数：1〜${maxTurn}`
+          : 'まだ戻れるターンがありません。';
+        const raw = input.value.trim();
+        const target = Number(raw);
+        let error = '';
+        if (!raw) error = '戻りたいターン数を入力してください。';
+        else if (!Number.isSafeInteger(target) || target < 1) error = '1以上の整数を入力してください。';
+        else if (target > maxTurn) error = `現在の状態から戻れるのは第${maxTurn}ターンまでです。`;
+        $('rewindError').textContent = error;
+        $('rewindConfirmButton').disabled = Boolean(error) || state.demoBatchRunning;
+      }
+      function openRewindPanel() {
+        if (!state.started || !state.history.length || state.demoBatchRunning) return;
+        $('rewindPanel').hidden = false;
+        $('rewindTurnInput').value = '';
+        setHistoryItemsRewindSelectable(true);
+        $('historyList').querySelectorAll('.history-item').forEach(item => item.classList.remove('selected-for-rewind'));
+        $('historyList').querySelectorAll('.history-item').forEach((item, index) => {
+          const entry = state.history[index];
+          if (entry) item.setAttribute('aria-label', `第${entry.turnIndex}ターンからやり直す位置に指定`);
+        });
+        updateRewindPanelValidity();
+        $('rewindTurnInput').focus();
+      }
+      function closeRewindPanel() {
+        $('rewindPanel').hidden = true;
+        $('rewindTurnInput').value = '';
+        setHistoryItemsRewindSelectable(false);
+        $('rewindError').textContent = '';
+      }
+      function undoLastHistoryEvent() {
+        if (!state.history.length) return null;
+        const removed = state.history.pop();
+        removeLastHistoryEntry();
+        state.turn = removed.player;
+        if (removed.foul) {
+          state.activePlayers[removed.player] = true;
+          if (state.eliminationOrder[state.eliminationOrder.length - 1] === removed.player) state.eliminationOrder.pop();
+          else state.eliminationOrder = state.eliminationOrder.filter(player => player !== removed.player);
+          if (!removed.automatic) state.playerCounts[removed.player] = Math.max(0, state.playerCounts[removed.player] - 1);
+          releaseEntryCache(removed);
+        } else {
+          const validRemoved = state.words.pop();
+          if (validRemoved && validRemoved.alphabetFamilyChange && state.alphabetOrderContext) {
+            undoAlphabetSetFromFamily(validRemoved, state.alphabetOrderContext);
+          }
+          if (validRemoved && validRemoved.commutativeFamilyChange && state.commutativeOrderContext) {
+            undoCommutativeVectorFromFamily(validRemoved);
+          }
+          if (validRemoved && Object.prototype.hasOwnProperty.call(validRemoved, 'subsequenceLanguageBefore')
+              && state.subsequenceOrderContext) {
+            state.subsequenceLanguage = validRemoved.subsequenceLanguageBefore;
+            delete validRemoved.subsequenceLanguageBefore;
+            if (Object.prototype.hasOwnProperty.call(validRemoved, 'subsequencePruningOccurredBefore')) {
+              state.subsequencePruningOccurred = validRemoved.subsequencePruningOccurredBefore;
+              delete validRemoved.subsequencePruningOccurredBefore;
+            }
+          }
+          releaseEntryCache(validRemoved);
+          if (validRemoved && validRemoved.indexed && state.fastLookup.get(validRemoved.indexKey) === validRemoved) {
+            state.fastLookup.delete(validRemoved.indexKey);
+          }
+          state.playerCounts[removed.player] = Math.max(0, state.playerCounts[removed.player] - 1);
+        }
+        if (Array.isArray(state.demoAlphabetSequence)) {
+          state.demoAlphabetSequence = state.demoAlphabetSequence.slice(0, state.words.length + 1);
+        }
+        if (Array.isArray(state.demoCommutativeSequence)) {
+          state.demoCommutativeSequence = state.demoCommutativeSequence.slice(0, state.words.length + 1);
+        }
+        state.finished = false;
+        state.loser = null;
+        state.winner = null;
+        state.endReason = null;
+        state.noMoveDetail = null;
+        return removed;
+      }
+      function rewindToTurn(targetTurn) {
+        const maxTurn = getMaximumRewindTurn();
+        if (!Number.isSafeInteger(targetTurn) || targetTurn < 1 || targetTurn > maxTurn) {
+          feedback(`1〜${maxTurn}の整数で指定してください。`);
+          updateRewindPanelValidity();
+          return;
+        }
+        if (state.demoBatchRunning) {
+          feedback('お手本の連続生成中は戻せません。生成が終わってから操作してください。');
+          return;
+        }
+        let removedCount = 0;
+        // 指定したターンの履歴を含めて以降を取り消し、そのターンの開始状態に戻す。
+        while (state.history.length && state.history[state.history.length - 1].turnIndex >= targetTurn) {
+          undoLastHistoryEvent();
+          removedCount++;
+        }
+        if (!removedCount) {
+          closeRewindPanel();
+          feedback(`第${targetTurn}ターンより前に戻せる履歴はありません。`);
+          render();
+          return;
+        }
+        closeRewindPanel();
+        feedback(`第${targetTurn}ターン目からやり直せる状態に戻しました。`, 'success');
+        render();
+        if (!isDemoMode()) $('wordInput').focus();
+        else $('demoNextButton').focus();
       }
       function updateHistoryOwnerNames() {
         $('historyList').querySelectorAll('.history-item').forEach(item => {
@@ -4276,7 +4463,9 @@
         } else {
           $('wordInput').placeholder = previous ? (previous.nextJoinCount ? `「${previous.next}」から始まる文字列` : '接続制限なしで入力') : '文字列を入力';
         }
-        $('undoButton').disabled = state.history.length === 0;
+        $('undoButton').disabled = state.history.length === 0 || state.demoBatchRunning;
+        $('rewindButton').disabled = !state.started || state.history.length === 0 || state.demoBatchRunning;
+        if (!$('rewindPanel').hidden) updateRewindPanelValidity();
         const orderTypeCalculationConfigured = state.started
           && (['alphabet', 'commutative'].includes(remainingRule) || subsequenceOrderApplicable || idempotentOrderApplicable)
           && $('showRemainingTurns').checked;
@@ -4564,6 +4753,7 @@
       }
 
       function restoreGameFromSaveData(data) {
+        closeRewindPanel();
         validateGameSaveData(data);
         const rulesValues = data.settings.values;
         for (const id of settingIds) {
@@ -4695,6 +4885,7 @@
       }
 
       function startGameNow() {
+        closeRewindPanel();
         state.alphabetFamily = [];
         state.alphabetOrderContext = null;
         state.commutativeFamily = [];
@@ -5036,59 +5227,38 @@
       });
 
       $('undoButton').addEventListener('click', () => {
-        if (!state.history.length) return;
-        const removed = state.history.pop();
-        removeLastHistoryEntry();
-        state.turn = removed.player;
-        if (removed.foul) {
-          state.activePlayers[removed.player] = true;
-          if (state.eliminationOrder[state.eliminationOrder.length - 1] === removed.player) state.eliminationOrder.pop();
-          else state.eliminationOrder = state.eliminationOrder.filter(player => player !== removed.player);
-          if (!removed.automatic) state.playerCounts[removed.player] = Math.max(0, state.playerCounts[removed.player] - 1);
-          releaseEntryCache(removed);
-        } else {
-          const validRemoved = state.words.pop();
-          if (validRemoved && validRemoved.alphabetFamilyChange && state.alphabetOrderContext) {
-            undoAlphabetSetFromFamily(validRemoved, state.alphabetOrderContext);
-          }
-          if (validRemoved && validRemoved.commutativeFamilyChange && state.commutativeOrderContext) {
-            undoCommutativeVectorFromFamily(validRemoved);
-          }
-          if (validRemoved && Object.prototype.hasOwnProperty.call(validRemoved, 'subsequenceLanguageBefore')
-              && state.subsequenceOrderContext) {
-            state.subsequenceLanguage = validRemoved.subsequenceLanguageBefore;
-            delete validRemoved.subsequenceLanguageBefore;
-            if (Object.prototype.hasOwnProperty.call(validRemoved, 'subsequencePruningOccurredBefore')) {
-              state.subsequencePruningOccurred = validRemoved.subsequencePruningOccurredBefore;
-              delete validRemoved.subsequencePruningOccurredBefore;
-            }
-          }
-          releaseEntryCache(validRemoved);
-          if (validRemoved && validRemoved.indexed && state.fastLookup.get(validRemoved.indexKey) === validRemoved) {
-            state.fastLookup.delete(validRemoved.indexKey);
-          }
-          state.playerCounts[removed.player] = Math.max(0, state.playerCounts[removed.player] - 1);
-        }
-        if (Array.isArray(state.demoAlphabetSequence)) {
-          state.demoAlphabetSequence = state.demoAlphabetSequence.slice(0, state.words.length + 1);
-        }
-        if (Array.isArray(state.demoCommutativeSequence)) {
-          state.demoCommutativeSequence = state.demoCommutativeSequence.slice(0, state.words.length + 1);
-        }
-        state.finished = false;
-        state.loser = null;
-        state.winner = null;
-        state.endReason = null;
-        state.noMoveDetail = null;
+        if (!state.history.length || state.demoBatchRunning) return;
+        closeRewindPanel();
+        const removed = undoLastHistoryEvent();
+        if (!removed) return;
         feedback(removed.foul
           ? `${nameOf(removed.player)}の反則・脱落を取り消しました。`
           : `「${removed.memo}」を取り消しました。`);
         render();
-        $('wordInput').focus();
+        if (!isDemoMode()) $('wordInput').focus();
+      });
+      $('rewindButton').addEventListener('click', openRewindPanel);
+      $('rewindTurnInput').addEventListener('input', updateRewindPanelValidity);
+      $('rewindTurnInput').addEventListener('keydown', event => {
+        if (event.key === 'Enter' && !$('rewindConfirmButton').disabled) $('rewindConfirmButton').click();
+        if (event.key === 'Escape') $('rewindCancelButton').click();
+      });
+      $('rewindConfirmButton').addEventListener('click', () => {
+        const target = Number($('rewindTurnInput').value);
+        if (!Number.isSafeInteger(target)) {
+          updateRewindPanelValidity();
+          return;
+        }
+        rewindToTurn(target);
+      });
+      $('rewindCancelButton').addEventListener('click', () => {
+        closeRewindPanel();
+        render();
       });
 
       $('resetButton').addEventListener('click', () => {
         if ((state.started || state.history.length) && !window.confirm('これまでの記録を消して、設定画面に戻りますか？')) return;
+        closeRewindPanel();
         state.started = false;
         state.demoBatchRunning = false;
         $('demoStatus').textContent = '開始後に、お手本の続きを再生できます。';
