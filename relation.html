@@ -1,0 +1,2188 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <link rel="stylesheet" href="common-menu.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="文字列同士の関係を図で確かめるページ">
+  <title>文字列同士の関係</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #28332e;
+      --muted: #778078;
+      --paper: #fbfaf6;
+      --canvas: #f2eee5;
+      --card: #fffefa;
+      --line: #e6e2d8;
+      --green: #527764;
+      --green-dark: #3e604f;
+      --green-pale: #e8f0e9;
+      --orange: #c77b4e;
+      --orange-pale: #f8eee6;
+      --good: #3e604f;
+      --bad: #b64f48;
+      --circle: #527764;
+      --arrow: #778078;
+      --shadow: 0 18px 50px rgba(50, 57, 48, .08);
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        radial-gradient(ellipse at 12% 8%, rgba(199,123,78,.09), transparent 30rem),
+        radial-gradient(ellipse at 92% 85%, rgba(82,119,100,.09), transparent 34rem),
+        var(--canvas);
+      line-height: 1.75;
+    }
+
+    main {
+      width: min(960px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 42px 0 54px;
+    }
+
+    h1 {
+      margin: 0 0 18px;
+      font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
+      font-size: clamp(30px, 5vw, 43px);
+      font-weight: 600;
+      letter-spacing: .08em;
+      line-height: 1.35;
+      text-align: center;
+    }
+
+    .notice {
+      margin: 0 0 24px;
+      padding: 13px 16px;
+      border: 1px solid #dfe7dc;
+      border-left: 4px solid var(--green);
+      border-radius: 12px;
+      background: var(--green-pale);
+      color: var(--green-dark);
+      font-size: 13px;
+    }
+
+    .relation-card {
+      margin: 20px 0;
+      padding: clamp(18px, 3.5vw, 28px);
+      background: var(--card);
+      border: 1px solid rgba(95,106,92,.12);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+    }
+
+    h2 {
+      margin: 0 0 10px;
+      padding-bottom: 9px;
+      border-bottom: 1px solid var(--line);
+      color: var(--green-dark);
+      font-size: 1.3rem;
+      font-weight: 800;
+      letter-spacing: .025em;
+    }
+
+    .explanation { margin: 0 0 18px; }
+    .example { margin-top: 7px; }
+
+    .inputs {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin: 18px 0 12px;
+    }
+
+    .field label {
+      display: block;
+      margin-bottom: 5px;
+      color: #5d6d60;
+      font-size: .9rem;
+      font-weight: 800;
+    }
+
+    .field input,
+    .field select {
+      display: block;
+      width: 100%;
+      min-width: 0;
+      padding: 10px 12px;
+      border: 1px solid #dcded5;
+      border-radius: 10px;
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+      font-size: 1rem;
+    }
+
+    .field input:focus-visible,
+    .field select:focus-visible {
+      outline: 3px solid rgba(82,119,100,.14);
+      border-color: #8aa894;
+    }
+
+    .gap-character-set {
+      max-width: 350px;
+      margin: 18px 0 2px;
+    }
+
+    .gap-input-note {
+      margin: 4px 0 10px;
+      color: var(--muted);
+      font-size: .78rem;
+    }
+
+    .svg-gap-line {
+      fill: none;
+      stroke-width: 2.4;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .svg-gap-line.good { stroke: var(--good); }
+    .svg-gap-line.bad { stroke: var(--bad); }
+
+    .svg-gap-legend-line {
+      stroke-width: 2.5;
+      stroke-linecap: round;
+    }
+    .svg-gap-legend-line.good { stroke: var(--good); }
+    .svg-gap-legend-line.bad { stroke: var(--bad); }
+    .svg-gap-legend-text {
+      font-size: 13px;
+      dominant-baseline: middle;
+    }
+    .svg-gap-legend-text.good { fill: var(--good); }
+    .svg-gap-legend-text.bad { fill: var(--bad); }
+
+    .gap-result-note {
+      margin: 2px 0 0;
+      text-align: center;
+      color: var(--muted);
+      font-size: .88rem;
+      line-height: 1.55;
+    }
+    .gap-result-note[hidden] { display: none; }
+
+    .diagram-heading {
+      margin: 18px 0 5px;
+      color: var(--muted);
+      font-size: .82rem;
+      font-weight: 800;
+      letter-spacing: .04em;
+    }
+
+    .diagram-scroll {
+      overflow-x: auto;
+      padding: 7px 5px 9px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fffefa;
+      scrollbar-color: #c6cec4 transparent;
+    }
+
+    svg.diagram {
+      display: block;
+      min-width: 100%;
+      height: auto;
+      overflow: visible;
+    }
+
+    .result {
+      min-height: 1.8em;
+      margin: 12px 0 0;
+      text-align: center;
+      font-size: 1.02rem;
+      font-weight: 800;
+      overflow-wrap: anywhere;
+    }
+
+    .result.yes { color: var(--good); }
+    .result.no { color: var(--bad); }
+
+    .svg-row-label {
+      fill: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .svg-character {
+      fill: var(--ink);
+      font-size: 22px;
+      dominant-baseline: middle;
+      text-anchor: middle;
+    }
+
+    .svg-row-string {
+      fill: var(--ink);
+      font-size: 22px;
+      dominant-baseline: middle;
+      text-anchor: start;
+    }
+
+    .svg-count-label {
+      fill: var(--ink);
+      font-size: 17px;
+      dominant-baseline: middle;
+      text-anchor: start;
+    }
+
+    .svg-count-value {
+      fill: var(--ink);
+      font-size: 15px;
+      dominant-baseline: middle;
+      text-anchor: start;
+    }
+
+    .svg-count-group.good { fill: var(--good); }
+    .svg-count-group.bad { fill: var(--bad); }
+
+    .svg-count-mark {
+      font-size: 20px;
+      font-weight: 800;
+      dominant-baseline: middle;
+      text-anchor: middle;
+    }
+
+    .svg-count-mark.good { fill: var(--good); }
+    .svg-count-mark.bad { fill: var(--bad); }
+
+    .svg-circle {
+      fill: #fffefa;
+      stroke: var(--circle);
+      stroke-width: 1.8;
+    }
+
+    .svg-ghost {
+      fill: #fffefa;
+      fill-opacity: .55;
+      stroke: #a8b0a5;
+      stroke-width: 1.7;
+      stroke-dasharray: 3.5 3.5;
+    }
+
+    .svg-arrow {
+      fill: none;
+      stroke: var(--arrow);
+      stroke-width: 1.6;
+    }
+
+    .svg-mark {
+      fill: #fffefa;
+      stroke: #fffefa;
+      stroke-width: 6px;
+      paint-order: stroke;
+      font-size: 18px;
+      font-weight: 800;
+      text-anchor: middle;
+      dominant-baseline: middle;
+    }
+
+    .svg-mark.good { fill: var(--good); }
+    .svg-mark.bad { fill: var(--bad); }
+
+    .empty-note {
+      fill: #929b91;
+      font-size: 14px;
+      text-anchor: middle;
+      dominant-baseline: middle;
+    }
+
+
+    .page-intro {
+      margin: -5px 0 18px;
+      color: var(--muted);
+      text-align: center;
+      font-size: .96rem;
+    }
+
+    .batch-card {
+      margin-top: 0;
+      border-color: rgba(82,119,100,.25);
+      background: linear-gradient(135deg, rgba(232,240,233,.5), rgba(255,254,250,1) 55%);
+    }
+
+    .batch-actions {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 9px;
+      margin: 4px 0 12px;
+    }
+
+    .swap-button,
+    .batch-run {
+      appearance: none;
+      border: 1px solid #cbd8cd;
+      border-radius: 10px;
+      padding: 8px 13px;
+      background: #f4f7f1;
+      color: var(--green-dark);
+      font: inherit;
+      font-size: .88rem;
+      font-weight: 750;
+      cursor: pointer;
+      transition: background .15s ease, transform .15s ease;
+    }
+    .swap-button:hover,
+    .batch-run:hover { background: #e8f0e9; }
+    .swap-button:active,
+    .batch-run:active { transform: translateY(1px); }
+    .batch-run {
+      border-color: var(--green-dark);
+      background: var(--green-dark);
+      color: white;
+    }
+    .batch-run:hover { background: #314d3e; }
+    .batch-run:focus-visible,
+    .swap-button:focus-visible,
+    .batch-result-link:focus-visible {
+      outline: 3px solid rgba(82,119,100,.25);
+      outline-offset: 2px;
+    }
+
+    .swap-row {
+      display: flex;
+      justify-content: flex-end;
+      margin: -4px 0 9px;
+    }
+
+    .batch-gap-warning {
+      margin: 4px 0 10px;
+      padding: 9px 12px;
+      border-radius: 9px;
+      background: var(--orange-pale);
+      color: #9b5835;
+      font-size: .85rem;
+      font-weight: 700;
+    }
+    .batch-gap-warning[hidden],
+    .batch-gap-caption[hidden],
+    .batch-results[hidden] { display: none; }
+
+    .batch-gap-caption {
+      margin: 2px 0 8px;
+      color: var(--muted);
+      font-size: .82rem;
+    }
+
+    .batch-results {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 7px 10px;
+      margin-top: 8px;
+    }
+
+    .batch-result-row {
+      display: flex;
+      min-width: 0;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 11px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: rgba(255,255,255,.8);
+    }
+
+    .batch-result-row.unavailable {
+      opacity: .35;
+    }
+
+    .batch-result-link {
+      min-width: 0;
+      color: var(--green-dark);
+      font-size: .9rem;
+      font-weight: 750;
+      text-decoration: none;
+      text-underline-offset: 3px;
+      overflow-wrap: anywhere;
+    }
+    .batch-result-link:hover { text-decoration: underline; }
+
+    .batch-status {
+      flex: 0 0 auto;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #edf1eb;
+      color: var(--muted);
+      font-size: .76rem;
+      font-weight: 800;
+    }
+    .batch-status.yes { background: var(--green-pale); color: var(--good); }
+    .batch-status.no { background: #f8e9e6; color: var(--bad); }
+
+    .relation-card[id] { scroll-margin-top: 20px; }
+
+    .bad-sequence-card {
+      border-color: rgba(199,123,78,.28);
+      background: linear-gradient(135deg, rgba(248,238,230,.52), rgba(255,254,250,1) 55%);
+    }
+
+    .bad-sequence-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin: 18px 0 12px;
+    }
+
+    .bad-sequence-controls .field {
+      flex: 1 1 260px;
+      min-width: 0;
+    }
+
+    .sequence-input-wrap {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      height: 248px;
+      overflow: hidden;
+      border: 1px solid #dcded5;
+      border-radius: 10px;
+      background: #fff;
+    }
+
+    .sequence-line-numbers {
+      min-width: 3.1rem;
+      padding: 12px 9px;
+      overflow: hidden;
+      border-right: 1px solid #e6e8e0;
+      background: #f5f6f1;
+      color: var(--muted);
+      text-align: right;
+      user-select: none;
+      font: 15px/28px ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+
+    .sequence-line-numbers span {
+      display: block;
+      height: 28px;
+    }
+
+    #bad-sequence-input {
+      display: block;
+      width: 100%;
+      min-width: 0;
+      height: 100%;
+      margin: 0;
+      padding: 12px 11px;
+      resize: vertical;
+      border: 0;
+      border-radius: 0;
+      outline: 0;
+      background: #fff;
+      color: var(--ink);
+      font: 15px/28px ui-monospace, SFMono-Regular, Consolas, monospace;
+      white-space: pre;
+      overflow: auto;
+      tab-size: 4;
+    }
+
+    #bad-sequence-input:focus-visible {
+      outline: 3px solid rgba(82,119,100,.18);
+      outline-offset: -3px;
+    }
+
+    .bad-sequence-note {
+      margin: 7px 0 10px;
+      color: var(--muted);
+      font-size: .8rem;
+    }
+
+    .bad-sequence-theory {
+      margin-top: 22px;
+      padding-top: 17px;
+      border-top: 1px solid var(--line);
+    }
+
+    .bad-sequence-theory p {
+      margin: 0 0 12px;
+    }
+
+    .bad-sequence-result {
+      min-height: 1.8em;
+      margin: 12px 0 0;
+      text-align: center;
+      font-size: 1rem;
+      font-weight: 800;
+      overflow-wrap: anywhere;
+    }
+
+    .bad-sequence-result.yes { color: var(--good); }
+    .bad-sequence-result.no { color: var(--bad); }
+
+    @media (max-width: 620px) {
+      .bad-sequence-controls { gap: 10px; }
+      .bad-sequence-card .batch-actions { justify-content: stretch; }
+      .bad-sequence-card .batch-actions button { flex: 1 1 100%; }
+    }
+
+    @media (max-width: 620px) {
+      .batch-results { grid-template-columns: 1fr; }
+      .batch-actions { justify-content: stretch; }
+      .batch-actions button { flex: 1 1 auto; }
+      .swap-row .swap-button { width: 100%; }
+    }
+
+    @media (max-width: 620px) {
+      main { width: min(100% - 20px, 960px); padding-top: 28px; }
+      h1 { letter-spacing: .045em; }
+      .inputs { grid-template-columns: 1fr; gap: 10px; }
+      .relation-card { padding: 17px 14px; border-radius: 17px; }
+      .notice { font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="site-menu"></div>
+  <script src="common-menu.js" defer></script>
+  <main>
+    <h1>文字列同士の関係</h1>
+    <p class="page-intro">文字列同士の関係についての説明をまとめたページです。</p>
+    <p class="notice">注意 : 文字列同士の関係を表す用語は割と色んな流儀があります。ここでの呼び方が他文献の呼び方とは異なる可能性があります。</p>
+
+    <section class="relation-card batch-card" aria-labelledby="batch-title">
+      <h2 id="batch-title">13種類まとめて判定</h2>
+      <p class="explanation">AとBを入力すると、下にある13種類の関係を一度に判定します。結果の関係名を押すと、説明と図に移動します。</p>
+      <div class="inputs">
+        <div class="field"><label for="batch-a">A</label><input id="batch-a" type="text" autocomplete="off" placeholder="文字列A"></div>
+        <div class="field"><label for="batch-b">B</label><input id="batch-b" type="text" autocomplete="off" placeholder="文字列B"></div>
+      </div>
+      <div class="batch-actions">
+        <button type="button" class="swap-button" id="batch-swap">AとBを入れ替える</button>
+        <button type="button" class="batch-run" id="batch-run">13種類をまとめて判定</button>
+      </div>
+      <p class="batch-gap-warning" id="batch-gap-warning" hidden>gap部分列はひらがなのみ、カタカナのみ、アルファベットのみ、0～9の数字のみのいずれかとしてください</p>
+      <p class="batch-gap-caption" id="batch-gap-caption" hidden></p>
+      <div class="batch-results" id="batch-results" aria-live="polite" hidden></div>
+    </section>
+
+    <section class="relation-card bad-sequence-card" aria-labelledby="bad-sequence-title">
+      <h2 id="bad-sequence-title">悪列判定</h2>
+      <p class="explanation">文字列を改行して複数入力して文字列関係を選び、「悪列か判定する」を押すと、上にある文字列が下にある文字列の部分列(などの文字列関係)になってるようなペアがあるか判定します。<br>「反鎖か判定する」を押すと、上下のどちらでもいいので関係をもつペアがあるか判定します。</p>
+
+      <div class="bad-sequence-controls">
+        <div class="field">
+          <label for="bad-sequence-relation">文字列同士の関係</label>
+          <select id="bad-sequence-relation"></select>
+        </div>
+        <div class="field" id="bad-sequence-gap-charset-wrap" hidden>
+          <label for="bad-sequence-gap-charset">gap系で使用する文字集合</label>
+          <select id="bad-sequence-gap-charset">
+            <option value="hiragana" selected>ひらがなのみ</option>
+            <option value="katakana">カタカナのみ</option>
+            <option value="latin">ラテンアルファベットのみ</option>
+            <option value="digits">0〜9の数字のみ</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="bad-sequence-input">文字列（1行に1つ）</label>
+        <div class="sequence-input-wrap">
+          <div class="sequence-line-numbers" id="bad-sequence-line-numbers" aria-hidden="true"><span>1</span></div>
+          <textarea id="bad-sequence-input" rows="8" wrap="off" spellcheck="false" autocomplete="off" aria-describedby="bad-sequence-note"></textarea>
+        </div>
+      </div>
+      <p class="bad-sequence-note" id="bad-sequence-note">空行は空文字列として扱います。gap系の関係を選んだ場合は、選択した文字集合の文字だけを入力してください。アルファベットは大文字・小文字を区別しません。</p>
+
+      <div class="batch-actions">
+        <button type="button" class="batch-run" id="bad-sequence-run">悪列か判定する</button>
+        <button type="button" class="swap-button" id="antichain-run">反鎖か判定する</button>
+      </div>
+      <p class="bad-sequence-result" id="bad-sequence-result" aria-live="polite"></p>
+      <p class="bad-sequence-result" id="antichain-result" aria-live="polite"></p>
+
+      <div class="bad-sequence-theory">
+        <p>何らかの数学的対象(本サイトでは文字列)の列に対して、その列に対象AとBが、AよりもBが後に来るように現れて、更に前順序関係A≼Bが成り立つとき、その列は≼について<strong>良列</strong>であるといいます。逆に、AよりもBが後に現れるどんなペアについてもA≼Bが成り立たないとき、その列は≼について<strong>悪列</strong>であるといいます。</p>
+        <p>悪列のうち、更にAよりもBが後に現れるどんなペアについてもB≼Aが成り立たなければ、その列は≼について<strong>反鎖</strong>であるといいます。</p>
+        <p>長さ無限の悪列が存在しないような前順序関係はWQOと呼ばれます。本サイトで扱う文字列同士の関係は、1.から4.を除き全てWQOです。</p>
+      </div>
+    </section>
+
+    <section class="relation-card" id="relation-equal" data-kind="equal" data-top="ずんだもん" data-bottom="ずんだもん">
+      <h2>同一文字列</h2>
+      <p class="explanation">全く同じ文字列のことを、ここでは<strong>同一文字列</strong>と呼びます。<br>使われてる文字の種類や個数、順番が少しでも違えば同一文字列ではありません。</p>
+      <div class="inputs">
+        <div class="field"><label for="equal-top">A</label><input id="equal-top" type="text" data-input="top" value="ずんだもん" autocomplete="off"></div>
+        <div class="field"><label for="equal-bottom">B</label><input id="equal-bottom" type="text" data-input="bottom" value="ずんだもん" autocomplete="off"></div>
+      </div>
+      <div class="swap-row"><button type="button" class="swap-button" data-swap-card>AとBを入れ替える</button></div>
+      
+      <p class="diagram-heading">対応図</p>
+      <div class="diagram-scroll"><svg class="diagram" role="img" aria-label="2つの文字列の各文字を対応させた図"></svg></div>
+      <p class="result" aria-live="polite"></p>
+    </section>
+
+    <section class="relation-card" id="relation-prefix" data-kind="prefix" data-top="ずんだ" data-bottom="ずんだもん">
+      <h2>前置部分文字列</h2>
+      <p class="explanation">文字列Aの右端にいくつか(0個以上)文字を付け足して文字列Bができるとき、ここではAはBの<strong>前置部分文字列</strong>と呼びます。<br>例えば「ずんだ」の右端に「もん」を付け足して「ずんだもん」という文字列が作れるので、「ずんだ」は「ずんだもん」の前置部分文字列です。</p>
+      <div class="inputs">
+        <div class="field"><label for="prefix-top">A</label><input id="prefix-top" type="text" data-input="top" value="ずんだ" autocomplete="off"></div>
+        <div class="field"><label for="prefix-bottom">B</label><input id="prefix-bottom" type="text" data-input="bottom" value="ずんだもん" autocomplete="off"></div>
+      </div>
+      <div class="swap-row"><button type="button" class="swap-button" data-swap-card>AとBを入れ替える</button></div>
+      
+      <p class="diagram-heading">対応図</p>
+      <div class="diagram-scroll"><svg class="diagram" role="img" aria-label="前置部分文字列かどうかを示す図"></svg></div>
+      <p class="result" aria-live="polite"></p>
+    </section>
+
+    <section class="relation-card" id="relation-suffix" data-kind="suffix" data-top="マキ" data-bottom="ツルマキ">
+      <h2>後置部分文字列</h2>
+      <p class="explanation">文字列Aの左端にいくつか(0個以上)文字を付け足して文字列Bができるとき、ここではAはBの<strong>後置部分文字列</strong>と呼びます。<br>例えば「マキ」の左端に「ツル」を付け足して「ツルマキ」という文字列が作れるので、「マキ」は「ツルマキ」の後置部分文字列です。</p>
+      <div class="inputs">
+        <div class="field"><label for="suffix-top">A</label><input id="suffix-top" type="text" data-input="top" value="マキ" autocomplete="off"></div>
+        <div class="field"><label for="suffix-bottom">B</label><input id="suffix-bottom" type="text" data-input="bottom" value="ツルマキ" autocomplete="off"></div>
+      </div>
+      <div class="swap-row"><button type="button" class="swap-button" data-swap-card>AとBを入れ替える</button></div>
+      
+      <p class="diagram-heading">対応図</p>
+      <div class="diagram-scroll"><svg class="diagram" role="img" aria-label="後置部分文字列かどうかを示す図"></svg></div>
+      <p class="result" aria-live="polite"></p>
+    </section>
+
+    <section class="relation-card" id="relation-substring" data-kind="substring" data-top="キリン" data-bottom="ジャイアントキリング">
+      <h2>部分文字列</h2>
+      <p class="explanation">文字列Aの左右の端にそれぞれいくつか(0個以上)文字を付け足して文字列Bができるとき、ここではAはBの<strong>部分文字列(連続部分文字列)</strong>であると言います。<br>例えば、「キリン」の左端に「ジャイアント」、右端に「グ」を付け足して「ジャイアントキリング」という文字列が作れるので、「キリン」は「ジャイアントキリング」の部分文字列です。</p>
+      <div class="inputs">
+        <div class="field"><label for="substring-top">A</label><input id="substring-top" type="text" data-input="top" value="キリン" autocomplete="off"></div>
+        <div class="field"><label for="substring-bottom">B</label><input id="substring-bottom" type="text" data-input="bottom" value="ジャイアントキリング" autocomplete="off"></div>
+      </div>
+      <div class="swap-row"><button type="button" class="swap-button" data-swap-card>AとBを入れ替える</button></div>
+      
+      <p class="diagram-heading">対応図</p>
+      <div class="diagram-scroll"><svg class="diagram" role="img" aria-label="部分文字列かどうかを示す図"></svg></div>
+      <p class="result" aria-live="polite"></p>
+    </section>
+
+
+    <section class="relation-card" id="relation-subsequence" data-kind="subsequence" data-top="きりん" data-bottom="きりたん">
+      <h2>部分列</h2>
+      <p class="explanation">文字列Aに、左右の端や文字の間などにいくつか(0個以上)文字を付け足して文字列Bができるとき、ここではAはBの<strong>部分列</strong>であると言います。<br>例えば、「きりん」の文字の間に「た」を付け足して「きりたん」という文字列が作れるので、「きりん」は「きりたん」の部分列です。</p>
+      <div class="inputs">
+        <div class="field"><label for="subsequence-top">A</label><input id="subsequence-top" type="text" data-input="top" value="きりん" autocomplete="off"></div>
+        <div class="field"><label for="subsequence-bottom">B</label><input id="subsequence-bottom" type="text" data-input="bottom" value="きりたん" autocomplete="off"></div>
+      </div>
+      <div class="swap-row"><button type="button" class="swap-button" data-swap-card>AとBを入れ替える</button></div>
+      
+      <p class="diagram-heading">対応図</p>
+      <div class="diagram-scroll"><svg class="diagram" role="img" aria-label="部分列かどうかを示す図"></svg></div>
+      <p class="result" aria-live="polite"></p>
+    </section>
+
+    <section class="relation-card" id="relation-idempotent" data-kind="idempotent" data-top="きつつき" data-bottom="かみきつき">
+      <h2>冪等部分列</h2>
+      <p class="explanation">文字列Aに、左右の端や文字の間などにいくつか(0個以上)文字を付け足したり、連続した同じ文字を1文字にまとめたりして文字列Bができるとき、ここではAはBの<strong>冪等部分列</strong>であると言います。<br>例えば、「きつつき」の「つつ」を1文字にまとめて左に「かみ」を付け足すと「かみきつき」という文字列が作れるので、「きつつき」は「かみきつき」の冪等部分列です。<br>長い文字列が短い文字列の冪等部分列となる場合もあります。例えば「かたたたき」は「かたぬき」の冪等部分列です。</p>
+      <div class="inputs">
+        <div class="field"><label for="idempotent-top">A</label><input id="idempotent-top" type="text" data-input="top" value="きつつき" autocomplete="off"></div>
+        <div class="field"><label for="idempotent-bottom">B</label><input id="idempotent-bottom" type="text" data-input="bottom" value="かみきつき" autocomplete="off"></div>
+      </div>
+      <div class="swap-row"><button type="button" class="swap-button" data-swap-card>AとBを入れ替える</button></div>
+      
+      <p class="diagram-heading">対応図</p>
+      <div class="diagram-scroll"><svg class="diagram" role="img" aria-label="冪等部分列かどうかを示す図"></svg></div>
+      <p class="result" aria-live="polite"></p>
+    </section>
+
+    <section class="relation-card" id="relation-commutative" data-kind="commutative" data-top="UNDERTALE" data-bottom="DELTARUNE">
+      <h2>可換部分列</h2>
+      <p class="explanation">文字列Aに、いくつか(0個以上)文字を付け足したり並べ替えたりして文字列Bができるとき、ここではAはBの<strong>可換部分列</strong>であると言います。<br>例えばアナグラムは互いに可換部分列です。「UNDERTALE」は「DELTARUNE」の可換部分列です。<br>AがBの可換部分列となる同値な条件として、文字列Aに現れる各文字が(Aに現れる個数)≦(Bに現れる個数)を満たすことなどがあります。</p>
+      <div class="inputs">
+        <div class="field"><label for="commutative-top">A</label><input id="commutative-top" type="text" data-input="top" value="UNDERTALE" autocomplete="off"></div>
+        <div class="field"><label for="commutative-bottom">B</label><input id="commutative-bottom" type="text" data-input="bottom" value="DELTARUNE" autocomplete="off"></div>
+      </div>
+      <div class="swap-row"><button type="button" class="swap-button" data-swap-card>AとBを入れ替える</button></div>
+      
+      <p class="diagram-heading">対応図</p>
+      <div class="diagram-scroll"><svg class="diagram" role="img" aria-label="各文字の出現数を比較した図"></svg></div>
+      <p class="result" aria-live="polite"></p>
+    </section>
+
+    <section class="relation-card" id="relation-usedchars" data-kind="usedchars" data-top="メイカヒメ" data-bottom="ダメージカイヒ">
+      <h2>使用文字の包含</h2>
+      <p class="explanation">文字列Aに現れる全ての文字が文字列Bにも現れるとき、ここでは文字列Aが文字列Bに<strong>使用文字について包含されている</strong>と言います。<br>例えば、「メイカヒメ」に現れる各文字「メ」「イ」「カ」「ヒ」は「ダメージカイヒ」にも現れるので、「メイカヒメ」は「ダメージカイヒ」に、使用文字について包含されています。<br>各文字が出現するかどうかのみに着目し、個数や順番は無視します。<br>AがBに使用文字について包含される同値な条件として、Aに現れる文字全体の集合がBに現れる文字全体の集合の部分集合となることなどがあります。</p>
+      <div class="inputs">
+        <div class="field"><label for="usedchars-top">A</label><input id="usedchars-top" type="text" data-input="top" value="メイカヒメ" autocomplete="off"></div>
+        <div class="field"><label for="usedchars-bottom">B</label><input id="usedchars-bottom" type="text" data-input="bottom" value="ダメージカイヒ" autocomplete="off"></div>
+      </div>
+      <div class="swap-row"><button type="button" class="swap-button" data-swap-card>AとBを入れ替える</button></div>
+      
+      <p class="diagram-heading">対応図</p>
+      <div class="diagram-scroll"><svg class="diagram" role="img" aria-label="Aに現れる各文字がBにも現れるかを示す図"></svg></div>
+      <p class="result" aria-live="polite"></p>
+    </section>
+
+    <section class="relation-card" id="relation-lastchar" data-kind="lastchar" data-top="ふたばみなと" data-bottom="たかはしあまと">
+      <h2>末尾文字の一致</h2>
+      <p class="explanation">名前の通り、文字列の右端の文字同士一致することです。便宜上、空文字列同士は末尾文字が一致しているとし、空文字列と非空文字列同士では一致していないとします。<br>例えば、「ふたばみなと」と「たかはしあまと」は末尾の文字が一致します。</p>
+      <div class="inputs">
+        <div class="field"><label for="lastchar-top">A</label><input id="lastchar-top" type="text" data-input="top" value="ふたばみなと" autocomplete="off"></div>
+        <div class="field"><label for="lastchar-bottom">B</label><input id="lastchar-bottom" type="text" data-input="bottom" value="たかはしあまと" autocomplete="off"></div>
+      </div>
+      <div class="swap-row"><button type="button" class="swap-button" data-swap-card>AとBを入れ替える</button></div>
+      
+      <p class="diagram-heading">対応図</p>
+      <div class="diagram-scroll"><svg class="diagram" role="img" aria-label="2つの文字列の末尾の文字を比較した図"></svg></div>
+      <p class="result" aria-live="polite"></p>
+    </section>
+
+
+    <section class="relation-card" id="relation-rightGap" data-kind="rightGap" data-top="きかい" data-bottom="ききかいかい">
+      <h2>右gap部分列</h2>
+      <p class="explanation">文字列Bの文字のいくつかをうまく選ぶと、その並びが文字列Aと一致して、更にB内の選ばれなかった文字(gap)それぞれに対して、それより右に選ばれた文字があるなら、右にある最も近いものは元の文字と等しいか元の文字より五十音順で早い文字となるようなとき、ここでは文字列Aは文字列Bの<strong>右gap部分列</strong>であるといいます。<br>例えば、「きりたん」から「た」以外の3文字を選ぶと「きりん」となりますが、選ばなかった文字(gap)である「た」の右には選んだ文字「ん」があり、「ん」は「た」より五十音順で遅いので、(また、他に「きりたん」から文字を選んで「きりん」にすることはできないので)「きりん」は「きりたん」の右gap部分列ではありません。<br>「ききかいかい」は1,5,6文字目を選ぶと「きかい」になりますが、選ばなかった4文字目の「い」の右には選んだ文字があり、そのうち最も近い5文字目の「か」は「い」より五十音順で遅いので、この選び方ではgap部分列ではなさそうに思えます。<br>しかし、1,3,4文字目を選んでも「きかい」となり、2文字目の「き」の右にある最も近い選んだ文字は3文字目の「か」なので五十音順で早く、残りの選ばなかった5,6文字目は右に選んだ文字がないので、この選び方により「きかい」は「ききかいかい」の右gap部分列となります。<br>文字の選び方、及びそのときに選ばなかった文字を全て確認する必要があるため、非常に複雑です。</p>
+      <div class="field gap-character-set">
+        <label for="rightgap-charset">使用する文字集合</label>
+        <select id="rightgap-charset" data-gap-charset>
+          <option value="digits">0〜9のみ</option>
+          <option value="latin">ラテンアルファベットのみ</option>
+          <option value="hiragana" selected>ひらがなのみ</option>
+          <option value="katakana">カタカナのみ</option>
+        </select>
+      </div>
+      <p class="gap-input-note">A・Bには選択した文字集合の文字だけを入力できます。ラテンアルファベットは小文字を大文字に統一し、文字の順序はかななら五十音順、ラテンアルファベット・数字ならそれぞれアルファベット順・数字順です。</p>
+      <div class="inputs">
+        <div class="field"><label for="rightgap-top">A</label><input id="rightgap-top" type="text" data-input="top" value="きかい" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+        <div class="field"><label for="rightgap-bottom">B</label><input id="rightgap-bottom" type="text" data-input="bottom" value="ききかいかい" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+      </div>
+      <div class="swap-row"><button type="button" class="swap-button" data-swap-card>AとBを入れ替える</button></div>
+      
+      <p class="diagram-heading">対応図</p>
+      <div class="diagram-scroll"><svg class="diagram" role="img" aria-label="右gap部分列かどうかを示す図"></svg></div>
+      <p class="result" aria-live="polite"></p>
+    </section>
+
+    <section class="relation-card" id="relation-rightWeakGap" data-kind="rightWeakGap" data-top="OR" data-bottom="HORROR">
+      <h2>右弱gap部分列</h2>
+      <p class="explanation">文字列Bの文字のいくつかをうまく選ぶと、その並びが文字列Aと一致して、更にB内の選ばれなかった文字(gap)それぞれに対して、その左右に選ばれた文字があるなら、右にある最も近いものは元の文字と等しいか元の文字より五十音順で早い文字となるようなとき、ここでは文字列AはBの<strong>右弱gap部分列</strong>であるといいます。<br>右gap部分列との違いは、左に選んだ文字がないgap文字についての確認をしないことのみです。判定が緩くなっているので、AがBの右gap部分列ならば、右弱gap部分列にもなります。<br>例えば「horror」の5,6文字目を選ぶと「or」となり、選ばなかった1,2,3,4文字目は左に選んだ文字がないので、そのまま「or」は「horror」の右弱gap部分列となります。右gap部分列ではこれらの1〜4文字目についても確認が必要になってしまい、実際「or」は「horror」の右gap部分列にはなりません。</p>
+      <div class="field gap-character-set">
+        <label for="rightweakgap-charset">使用する文字集合</label>
+        <select id="rightweakgap-charset" data-gap-charset>
+          <option value="digits">0〜9のみ</option>
+          <option value="latin" selected>ラテンアルファベットのみ</option>
+          <option value="hiragana">ひらがなのみ</option>
+          <option value="katakana">カタカナのみ</option>
+        </select>
+      </div>
+      <p class="gap-input-note">A・Bには選択した文字集合の文字だけを入力できます。ラテンアルファベットは小文字を大文字に統一し、文字の順序はかななら五十音順、ラテンアルファベット・数字ならそれぞれアルファベット順・数字順です。</p>
+      <div class="inputs">
+        <div class="field"><label for="rightweakgap-top">A</label><input id="rightweakgap-top" type="text" data-input="top" value="OR" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+        <div class="field"><label for="rightweakgap-bottom">B</label><input id="rightweakgap-bottom" type="text" data-input="bottom" value="HORROR" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+      </div>
+      <div class="swap-row"><button type="button" class="swap-button" data-swap-card>AとBを入れ替える</button></div>
+      
+      <p class="diagram-heading">対応図</p>
+      <div class="diagram-scroll"><svg class="diagram" role="img" aria-label="右弱gap部分列かどうかを示す図"></svg></div>
+      <p class="result" aria-live="polite"></p>
+    </section>
+
+
+    <section class="relation-card" id="relation-leftGap" data-kind="leftGap" data-top="い" data-bottom="あい">
+      <h2>左gap部分列</h2>
+      <p class="explanation">文字列Bの文字のいくつかをうまく選ぶと、その並びが文字列Aと一致して、更にB内の選ばれなかった文字(gap)それぞれに対して、それより左に選ばれた文字があるなら、左にある最も近いものは元の文字と等しいか元の文字より五十音順で早い文字となるようなとき、ここでは文字列AはBの<strong>左gap部分列</strong>であるといいます。<br>右gap部分列の左右を反転しただけです。正確に言えば、Aの反転文字列がBの反転文字列の右gap部分列であることと、AがBの左gap部分列であることは同値です。<br>部分列関係などは左右反転しても変わりませんでしたが、gapは左右反転すると結果が変わります。例えば、「い」は「あい」の右gap部分列ではありませんが、左gap部分列ではあります。<br>順序集合としては同型ではあるものの、しりとりのルールの都合上、左右の区別は必要なので、両方入れてます。</p>
+      <div class="field gap-character-set">
+        <label for="leftgap-charset">使用する文字集合</label>
+        <select id="leftgap-charset" data-gap-charset>
+          <option value="digits">0〜9のみ</option>
+          <option value="latin">ラテンアルファベットのみ</option>
+          <option value="hiragana" selected>ひらがなのみ</option>
+          <option value="katakana">カタカナのみ</option>
+        </select>
+      </div>
+      <p class="gap-input-note">A・Bには選択した文字集合の文字だけを入力できます。ラテンアルファベットは小文字を大文字に統一し、文字の順序はかななら五十音順、ラテンアルファベット・数字ならそれぞれアルファベット順・数字順です。</p>
+      <div class="inputs">
+        <div class="field"><label for="leftgap-top">A</label><input id="leftgap-top" type="text" data-input="top" value="い" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+        <div class="field"><label for="leftgap-bottom">B</label><input id="leftgap-bottom" type="text" data-input="bottom" value="あい" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+      </div>
+      <div class="swap-row"><button type="button" class="swap-button" data-swap-card>AとBを入れ替える</button></div>
+      
+      <p class="diagram-heading">対応図</p>
+      <div class="diagram-scroll"><svg class="diagram" role="img" aria-label="左gap部分列かどうかを示す図"></svg></div>
+      <p class="result" aria-live="polite"></p>
+    </section>
+
+    <section class="relation-card" id="relation-leftWeakGap" data-kind="leftWeakGap" data-top="あう" data-bottom="あいう">
+      <h2>左弱gap部分列</h2>
+      <p class="explanation">文字列Bの文字のいくつかをうまく選ぶと、その並びが文字列Aと一致して、更にB内の選ばれなかった文字(gap)それぞれに対して、その左右に選ばれた文字があるなら、左にある最も近いものは元の文字と等しいか元の文字より五十音順で早い文字となるようなとき、ここでは文字列AはBの<strong>左弱gap部分列</strong>であるといいます。<br>こちらも右弱gap部分列の左右反転バージョンです。<br>例えば「あう」は「あいう」の右弱gap部分列ではありませんが、左弱gap部分列ではあります。</p>
+      <div class="field gap-character-set">
+        <label for="leftweakgap-charset">使用する文字集合</label>
+        <select id="leftweakgap-charset" data-gap-charset>
+          <option value="digits">0〜9のみ</option>
+          <option value="latin">ラテンアルファベットのみ</option>
+          <option value="hiragana" selected>ひらがなのみ</option>
+          <option value="katakana">カタカナのみ</option>
+        </select>
+      </div>
+      <p class="gap-input-note">A・Bには選択した文字集合の文字だけを入力できます。ラテンアルファベットは小文字を大文字に統一し、文字の順序はかななら五十音順、ラテンアルファベット・数字ならそれぞれアルファベット順・数字順です。</p>
+      <div class="inputs">
+        <div class="field"><label for="leftweakgap-top">A</label><input id="leftweakgap-top" type="text" data-input="top" value="あう" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+        <div class="field"><label for="leftweakgap-bottom">B</label><input id="leftweakgap-bottom" type="text" data-input="bottom" value="あいう" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+      </div>
+      <div class="swap-row"><button type="button" class="swap-button" data-swap-card>AとBを入れ替える</button></div>
+      
+      <p class="diagram-heading">対応図</p>
+      <div class="diagram-scroll"><svg class="diagram" role="img" aria-label="左弱gap部分列かどうかを示す図"></svg></div>
+      <p class="result" aria-live="polite"></p>
+    </section>
+
+  </main>
+
+  <script>
+    (() => {
+      const NS = 'http://www.w3.org/2000/svg';
+      let diagramNumber = 0;
+      const CELL = 58;
+      const LEFT = 38;
+
+      // Segmenterはページ全体で一度だけ生成する。大量入力でも行ごと・比較ごとに作り直さない。
+      const graphemeSegmenter = typeof Intl !== 'undefined' && Intl.Segmenter
+        ? new Intl.Segmenter('ja', { granularity: 'grapheme' })
+        : null;
+
+      function splitCharacters(value) {
+        if (graphemeSegmenter) {
+          return Array.from(graphemeSegmenter.segment(value), item => item.segment);
+        }
+        return Array.from(value);
+      }
+
+      function makeSvgElement(name, attributes = {}, text = null) {
+        const element = document.createElementNS(NS, name);
+        for (const [key, value] of Object.entries(attributes)) {
+          element.setAttribute(key, String(value));
+        }
+        if (text !== null) element.textContent = text;
+        return element;
+      }
+
+      function addText(svg, x, y, text, className, extra = {}) {
+        svg.appendChild(makeSvgElement('text', { x, y, class: className, ...extra }, text));
+      }
+
+      function addCircle(svg, x, y, ghost = false) {
+        svg.appendChild(makeSvgElement('circle', {
+          cx: x, cy: y, r: 19, class: ghost ? 'svg-ghost' : 'svg-circle'
+        }));
+      }
+
+      function addMarker(svg, color = '#778078') {
+        const markerId = `arrow-head-${++diagramNumber}`;
+        const defs = makeSvgElement('defs');
+        const marker = makeSvgElement('marker', {
+          id: markerId, markerWidth: 7, markerHeight: 7,
+          refX: 5.5, refY: 3.5, orient: 'auto-start-reverse', markerUnits: 'strokeWidth'
+        });
+        marker.appendChild(makeSvgElement('path', {
+          d: 'M0,0 L7,3.5 L0,7', fill: 'none', stroke: color, 'stroke-width': 1.2
+        }));
+        defs.appendChild(marker);
+        svg.appendChild(defs);
+        return markerId;
+      }
+
+      function addArrow(svg, x, y1, y2, mark, markerId) {
+        svg.appendChild(makeSvgElement('line', {
+          x1: x, y1, x2: x, y2,
+          class: 'svg-arrow', 'marker-end': `url(#${markerId})`
+        }));
+        addText(svg, x, (y1 + y2) / 2, mark, `svg-mark ${mark === '○' ? 'good' : 'bad'}`);
+      }
+
+      function beginDiagram(svg, top, bottom, height, columns) {
+        while (svg.firstChild) svg.removeChild(svg.firstChild);
+        const width = Math.max(220, LEFT + Math.max(columns, 1) * CELL + 20);
+        svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+        svg.setAttribute('width', width);
+        svg.setAttribute('height', height);
+        svg.style.width = `${width}px`;
+        svg.setAttribute('aria-label', `${top.join('')} と ${bottom.join('')} の文字対応図`);
+        return { width, markerId: addMarker(svg) };
+      }
+
+      function xAt(column) {
+        return LEFT + column * CELL;
+      }
+
+      function isRelation(kind, top, bottom) {
+        if (kind === 'equal') {
+          return top.length === bottom.length && top.every((char, i) => char === bottom[i]);
+        }
+        if (kind === 'prefix') {
+          return top.length <= bottom.length && top.every((char, i) => char === bottom[i]);
+        }
+        if (kind === 'suffix') {
+          if (top.length > bottom.length) return false;
+          const start = bottom.length - top.length;
+          return top.every((char, i) => char === bottom[start + i]);
+        }
+        if (kind === 'substring') return isSubstring(top, bottom);
+        if (kind === 'subsequence') return isSubsequence(top, bottom);
+        if (kind === 'idempotent') return isSubsequence(compressRuns(top).map(run => run.char), bottom);
+        if (kind === 'commutative') {
+          const counts = chars => {
+            const map = new Map();
+            chars.forEach(char => map.set(char, (map.get(char) || 0) + 1));
+            return map;
+          };
+          const a = counts(top), b = counts(bottom);
+          return Array.from(a, ([char, count]) => count <= (b.get(char) || 0)).every(Boolean);
+        }
+        if (kind === 'usedchars') return top.every(char => bottom.includes(char));
+        if (kind === 'lastchar') return (top.length === 0 && bottom.length === 0) || (top.length > 0 && bottom.length > 0 && top[top.length - 1] === bottom[bottom.length - 1]);
+        if (kind === 'rightGap') return findRightGapEmbedding(top, bottom, false, 'hiragana') !== null;
+        if (kind === 'rightWeakGap') return findRightGapEmbedding(top, bottom, true, 'hiragana') !== null;
+        if (kind === 'leftGap') return findLeftGapEmbedding(top, bottom, false, 'hiragana') !== null;
+        if (kind === 'leftWeakGap') return findLeftGapEmbedding(top, bottom, true, 'hiragana') !== null;
+        return false;
+      }
+
+      function isSubstring(top, bottom) {
+        if (top.length > bottom.length) return false;
+        if (top.length === 0) return true;
+        for (let start = 0; start <= bottom.length - top.length; start++) {
+          let matches = true;
+          for (let i = 0; i < top.length; i++) {
+            if (top[i] !== bottom[start + i]) { matches = false; break; }
+          }
+          if (matches) return true;
+        }
+        return false;
+      }
+
+      // 左から順に最初に見つかった文字へ対応づける。
+      function greedySubsequenceMatches(pattern, text) {
+        const positions = [];
+        let cursor = 0;
+        for (const char of pattern) {
+          let found = -1;
+          for (let i = cursor; i < text.length; i++) {
+            if (text[i] === char) { found = i; break; }
+          }
+          if (found < 0) break;
+          positions.push(found);
+          cursor = found + 1;
+        }
+        return { positions, complete: positions.length === pattern.length };
+      }
+
+      function isSubsequence(pattern, text) {
+        let cursor = 0;
+        for (const char of text) {
+          if (cursor < pattern.length && pattern[cursor] === char) cursor++;
+        }
+        return cursor === pattern.length;
+      }
+
+      function compressRuns(chars) {
+        const runs = [];
+        for (const char of chars) {
+          const last = runs[runs.length - 1];
+          if (last && last.char === char) last.length++;
+          else runs.push({ char, length: 1 });
+        }
+        return runs;
+      }
+
+      const japaneseCollator = new Intl.Collator('ja', { usage: 'sort', sensitivity: 'variant' });
+      function sortJapanese(chars) {
+        return Array.from(chars).sort((a, b) => japaneseCollator.compare(a, b) || a.localeCompare(b, 'ja'));
+      }
+
+      // gap系の文字順。数字・ラテン文字は通常の順序、かなは日本語の照合順を使う。
+      function compareGapCharacters(a, b, charset) {
+        if (a === b) return 0;
+        if (charset === 'digits') return a.charCodeAt(0) - b.charCodeAt(0);
+        if (charset === 'latin') return a.charCodeAt(0) - b.charCodeAt(0);
+        return japaneseCollator.compare(a, b) || a.localeCompare(b, 'ja');
+      }
+
+      // 図の凡例は、文字集合とgapの向きに合わせて条件の意味まで表示する。
+      function getGapLegendLabels(kind, charset) {
+        const direction = (kind === 'leftGap' || kind === 'leftWeakGap') ? '左' : '右';
+        if (charset === 'digits') {
+          return {
+            good: `緑線 : gap条件成立（${direction}にある一番近い選んだ数字がもとの数字以上）`,
+            bad: `赤線 : gap条件不成立（${direction}にある一番近い選んだ文字がもとの数字未満）`
+          };
+        }
+        const orderName = charset === 'latin' ? 'アルファベット順' : '五十音順';
+        return {
+          good: `緑線 : gap条件成立（${direction}にある一番近い選んだ文字が同じか${orderName}で早い）`,
+          bad: `赤線 : gap条件不成立（${direction}にある一番近い選んだ文字が${orderName}で遅い）`
+        };
+      }
+
+      // 右gapの埋め込みを動的計画法で探す。
+      // 状態iはAの先頭i文字を選び終えた状態。次に選ぶA[i]が、読み飛ばすgap文字以下ならその文字をgapにできる。
+      // 右弱gapでは状態0を常に残し、最初に選ぶ文字より左のgapを自由にする。
+      // 各状態につき1つの証拠経路を保持すれば、以降の可否は状態iだけで決まる。
+      function findRightGapEmbedding(pattern, text, weak, charset) {
+        const m = pattern.length;
+        if (m === 0) return [];
+        if (m > text.length) return null;
+
+        const emptyPath = { position: -1, previous: null };
+        let active = new Array(m + 1).fill(null);
+        active[0] = emptyPath;
+
+        for (let t = 0; t < text.length; t++) {
+          const next = new Array(m + 1).fill(null);
+          // 後ろの状態から処理して、既に得られている証拠経路を優先する。
+          for (let i = m - 1; i >= 0; i--) {
+            const path = active[i];
+            if (!path) continue;
+
+            // この文字をA[i]に対応させる。
+            if (text[t] === pattern[i] && !next[i + 1]) {
+              next[i + 1] = { position: t, previous: path };
+            }
+            // この文字をgapとして読み飛ばす。右側の最も近い選択文字A[i]がgap以上ならよい。
+            if (compareGapCharacters(pattern[i], text[t], charset) <= 0 && !next[i]) {
+              next[i] = path;
+            }
+          }
+
+          if (weak) next[0] = emptyPath;
+          if (next[m]) {
+            const positions = [];
+            let node = next[m];
+            while (node && node.position >= 0) {
+              positions.push(node.position);
+              node = node.previous;
+            }
+            return positions.reverse();
+          }
+          active = next;
+        }
+        return null;
+      }
+
+      // 左gapは、A・Bを反転して右gap判定を行い、証拠位置を元の順序に戻す。
+      function findLeftGapEmbedding(pattern, text, weak, charset) {
+        const reversed = findRightGapEmbedding([...pattern].reverse(), [...text].reverse(), weak, charset);
+        if (reversed === null) return null;
+        return reversed.map(position => text.length - 1 - position).reverse();
+      }
+
+      function renderGapDiagram(svg, top, bottom, kind, witness, charset) {
+        const isLeft = kind === 'leftGap' || kind === 'leftWeakGap';
+        const weak = kind === 'rightWeakGap' || kind === 'leftWeakGap';
+        const greedy = greedySubsequenceMatches(top, bottom);
+        if (!greedy.complete) {
+          // AがBの部分列ですらない場合は、部分列の図と同じにしてgapの下線は描かない。
+          renderPairDiagram(svg, 'subsequence', top, bottom);
+          return;
+        }
+
+        // gap関係が成立すればその証拠を、成立しなければ通常の部分列と同じ貪欲対応を描く。
+        const selected = witness !== null ? witness : greedy.positions;
+        const selectedSet = new Set(selected);
+        const n = bottom.length;
+        const nextSelectedRight = new Int32Array(n).fill(-1);
+        const previousSelectedLeft = new Int32Array(n).fill(-1);
+
+        let nextRight = -1;
+        for (let i = n - 1; i >= 0; i--) {
+          if (selectedSet.has(i)) nextRight = i;
+          nextSelectedRight[i] = nextRight;
+        }
+        let previousLeft = -1;
+        for (let i = 0; i < n; i++) {
+          previousSelectedLeft[i] = previousLeft;
+          if (selectedSet.has(i)) previousLeft = i;
+        }
+
+        const gapLines = [];
+        for (let i = 0; i < n; i++) {
+          if (selectedSet.has(i)) continue;
+          if (isLeft) {
+            const left = previousSelectedLeft[i];
+            if (left < 0) continue; // 左に選択文字がないgapは確認しない。
+            if (weak && nextSelectedRight[i] < 0) continue; // 左弱gapは右に選択文字のない末尾gapを確認しない。
+            gapLines.push({
+              gap: i,
+              target: left,
+              distance: i - left,
+              valid: compareGapCharacters(bottom[left], bottom[i], charset) <= 0
+            });
+          } else {
+            const right = nextSelectedRight[i];
+            if (right < 0) continue; // 右に選択文字がないgapは確認しない。
+            if (weak && previousSelectedLeft[i] < 0) continue; // 右弱gapは左に選択文字のない先頭gapを確認しない。
+            gapLines.push({
+              gap: i,
+              target: right,
+              distance: right - i,
+              valid: compareGapCharacters(bottom[right], bottom[i], charset) <= 0
+            });
+          }
+        }
+        // 短い区間ほどBに近い位置に描き、長い線が短い線に被らないようにする。
+        gapLines.sort((a, b) => a.distance - b.distance || a.gap - b.gap);
+
+        const yTop = 38;
+        const yBottom = 132;
+        // 下線はBの文字に近い位置から始め、各gap文字の直下を縦に下ろしてから右へ折る。
+        const lineStartY = yBottom + 15;
+        const lineBaseY = 158;
+        const lineStep = 6;
+        const legendY = lineBaseY + gapLines.length * lineStep + 14;
+        const height = Math.max(220, legendY + 34);
+        const legendX = 30;
+        const legendLabels = getGapLegendLabels(kind, charset);
+        // SVGテキストは自動折り返しされないため、説明文全体が見える幅を確保する。
+        const longestLegendLength = Math.max(
+          Array.from(legendLabels.good).length,
+          Array.from(legendLabels.bad).length
+        );
+        const minimumLegendWidth = legendX + 25 + longestLegendLength * 13 + 18;
+        const { width: baseWidth, markerId } = beginDiagram(svg, top, bottom, height, n);
+        const width = Math.max(baseWidth, minimumLegendWidth);
+        if (width !== baseWidth) {
+          svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+          svg.setAttribute('width', width);
+          svg.style.width = `${width}px`;
+        }
+
+        gapLines.forEach((line, index) => {
+          const y = lineBaseY + index * lineStep;
+          const startX = xAt(line.gap);
+          const endX = xAt(line.target);
+          svg.appendChild(makeSvgElement('path', {
+            d: `M ${startX} ${lineStartY} V ${y} H ${endX}`,
+            class: `svg-gap-line ${line.valid ? 'good' : 'bad'}`
+          }));
+        });
+
+        // AがBの部分列である場合は、図の左下にgap条件の凡例と条件の意味を表示する。
+        svg.appendChild(makeSvgElement('line', {
+          x1: legendX, y1: legendY - 4, x2: legendX + 18, y2: legendY - 4,
+          class: 'svg-gap-legend-line good'
+        }));
+        addText(svg, legendX + 25, legendY - 4, legendLabels.good, 'svg-gap-legend-text good');
+        svg.appendChild(makeSvgElement('line', {
+          x1: legendX, y1: legendY + 17, x2: legendX + 18, y2: legendY + 17,
+          class: 'svg-gap-legend-line bad'
+        }));
+        addText(svg, legendX + 25, legendY + 17, legendLabels.bad, 'svg-gap-legend-text bad');
+
+        // Aは対応位置に置き、Aと選択されたBの文字を丸で囲んで下向き矢印で結ぶ。
+        selected.forEach((position, index) => {
+          const x = xAt(position);
+          addCircle(svg, x, yTop);
+          addText(svg, x, yTop, top[index], 'svg-character');
+        });
+        bottom.forEach((char, index) => {
+          const x = xAt(index);
+          if (selectedSet.has(index)) addCircle(svg, x, yBottom);
+          addText(svg, x, yBottom, char, 'svg-character');
+        });
+        selected.forEach(position => {
+          addArrow(svg, xAt(position), yTop + 22, yBottom - 22, '○', markerId);
+        });
+      }
+
+      function setDiagramSize(svg, width, height, top, bottom) {
+        while (svg.firstChild) svg.removeChild(svg.firstChild);
+        svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+        svg.setAttribute('width', width);
+        svg.setAttribute('height', height);
+        svg.style.width = `${width}px`;
+        svg.setAttribute('aria-label', `${top.join('')} と ${bottom.join('')} の文字対応図`);
+        return { width, markerId: addMarker(svg) };
+      }
+
+      function renderCommutativeDiagram(svg, top, bottom) {
+        const countsA = new Map(), countsB = new Map();
+        top.forEach(char => countsA.set(char, (countsA.get(char) || 0) + 1));
+        bottom.forEach(char => countsB.set(char, (countsB.get(char) || 0) + 1));
+        const chars = sortJapanese(new Set([...countsA.keys(), ...countsB.keys()]));
+        // 各項目の間隔を広げ、a個・b個は近づけてひとまとまりに見せる。
+        const countCell = 132;
+        const width = Math.max(260, 42 + chars.length * countCell, 40 + Math.max(top.length, bottom.length) * CELL);
+        setDiagramSize(svg, width, 260, top, bottom);
+        addText(svg, 30, 38, top.join(''), 'svg-row-string');
+        addText(svg, 30, 238, bottom.join(''), 'svg-row-string');
+        if (chars.length === 0) {
+          addText(svg, width / 2, 135, '（どちらも空文字列）', 'empty-note');
+          return;
+        }
+        chars.forEach((char, i) => {
+          const x = 36 + i * countCell;
+          const a = countsA.get(char) || 0;
+          const b = countsB.get(char) || 0;
+          const valid = a <= b;
+          const groupClass = `svg-count-group ${valid ? 'good' : 'bad'}`;
+          addText(svg, x, 130, valid ? '○' : '×', `svg-count-mark ${valid ? 'good' : 'bad'}`);
+          addText(svg, x + 17, 130, `${char} :`, `svg-count-label ${groupClass}`);
+          addText(svg, x + 58, 121, `${a}個`, `svg-count-value ${groupClass}`);
+          addText(svg, x + 58, 139, `${b}個`, `svg-count-value ${groupClass}`);
+        });
+      }
+
+      function renderUsedCharsDiagram(svg, top, bottom) {
+        const chars = sortJapanese(new Set(top));
+        const width = Math.max(240, 42 + chars.length * 82, 40 + Math.max(top.length, bottom.length) * CELL);
+        setDiagramSize(svg, width, 250, top, bottom);
+        addText(svg, 30, 38, top.join(''), 'svg-row-string');
+        addText(svg, 30, 228, bottom.join(''), 'svg-row-string');
+        if (chars.length === 0) {
+          addText(svg, width / 2, 132, '（Aに文字がありません）', 'empty-note');
+          return;
+        }
+        chars.forEach((char, i) => {
+          const x = 42 + i * 82;
+          const present = bottom.includes(char);
+          addText(svg, x, 132, `${present ? '○' : '×'}${char}`, `svg-count-mark ${present ? 'good' : 'bad'}`);
+        });
+      }
+
+      function renderLastCharDiagram(svg, top, bottom) {
+        const columns = Math.max(top.length, bottom.length, 1);
+        const { width, markerId } = beginDiagram(svg, top, bottom, 190, columns);
+        const topOffset = columns - top.length;
+        const bottomOffset = columns - bottom.length;
+        const topY = 42, bottomY = 148, finalX = xAt(columns - 1);
+        top.forEach((char, i) => {
+          const x = xAt(topOffset + i);
+          if (i === top.length - 1) addCircle(svg, x, topY);
+          addText(svg, x, topY, char, 'svg-character');
+        });
+        bottom.forEach((char, i) => {
+          const x = xAt(bottomOffset + i);
+          if (i === bottom.length - 1) addCircle(svg, x, bottomY);
+          addText(svg, x, bottomY, char, 'svg-character');
+        });
+        if (top.length === 0) addCircle(svg, finalX, topY, true);
+        if (bottom.length === 0) addCircle(svg, finalX, bottomY, true);
+        const line = makeSvgElement('line', {
+          x1: finalX, y1: topY + 21, x2: finalX, y2: bottomY - 21,
+          class: 'svg-arrow', 'marker-start': `url(#${markerId})`, 'marker-end': `url(#${markerId})`
+        });
+        svg.appendChild(line);
+        const matches = (top.length === 0 && bottom.length === 0) || (top.length > 0 && bottom.length > 0 && top[top.length - 1] === bottom[bottom.length - 1]);
+        addText(svg, finalX, (topY + bottomY) / 2, matches ? '○' : '×', `svg-mark ${matches ? 'good' : 'bad'}`);
+      }
+
+      function renderPairDiagram(svg, kind, top, bottom) {
+        let columns = Math.max(top.length, bottom.length);
+        const { width, markerId } = beginDiagram(svg, top, bottom, 186, columns);
+        if (columns === 0) {
+          addText(svg, width / 2, 96, '（どちらも空文字列）', 'empty-note');
+          return;
+        }
+
+        let topPositions = new Map();
+        let bottomPositions = new Map();
+        let bidirectional = false;
+
+        if (kind === 'equal') {
+          bidirectional = true;
+          for (let i = 0; i < top.length; i++) topPositions.set(i, top[i]);
+          for (let i = 0; i < bottom.length; i++) bottomPositions.set(i, bottom[i]);
+        } else if (kind === 'prefix') {
+          for (let i = 0; i < top.length; i++) topPositions.set(i, top[i]);
+          for (let i = 0; i < bottom.length; i++) bottomPositions.set(i, bottom[i]);
+        } else if (kind === 'suffix') {
+          const alignedColumns = Math.max(top.length, bottom.length);
+          const topOffset = alignedColumns - top.length;
+          const bottomOffset = alignedColumns - bottom.length;
+          for (let i = 0; i < top.length; i++) topPositions.set(topOffset + i, top[i]);
+          for (let i = 0; i < bottom.length; i++) bottomPositions.set(bottomOffset + i, bottom[i]);
+        } else if (kind === 'substring') {
+          let topStart = 0;
+          let bottomStart = 0;
+          if (top.length < bottom.length) {
+            let bestOffset = 0, bestMatches = -1;
+            for (let offset = 0; offset <= bottom.length - top.length; offset++) {
+              let matches = 0;
+              for (let i = 0; i < top.length; i++) if (top[i] === bottom[offset + i]) matches++;
+              if (matches > bestMatches) { bestMatches = matches; bestOffset = offset; }
+            }
+            topStart = bestOffset;
+          } else if (top.length > bottom.length) {
+            let bestOffset = 0, bestMatches = -1;
+            for (let offset = 0; offset <= top.length - bottom.length; offset++) {
+              let matches = 0;
+              for (let i = 0; i < bottom.length; i++) if (top[offset + i] === bottom[i]) matches++;
+              if (matches > bestMatches) { bestMatches = matches; bestOffset = offset; }
+            }
+            bottomStart = bestOffset;
+          }
+          for (let i = 0; i < top.length; i++) topPositions.set(topStart + i, top[i]);
+          for (let i = 0; i < bottom.length; i++) bottomPositions.set(bottomStart + i, bottom[i]);
+          columns = Math.max(top.length + topStart, bottom.length + bottomStart);
+          svg.setAttribute('viewBox', `0 0 ${Math.max(220, LEFT + Math.max(columns, 1) * CELL + 20)} 186`);
+          svg.setAttribute('width', Math.max(220, LEFT + Math.max(columns, 1) * CELL + 20));
+          svg.setAttribute('height', 186);
+          svg.style.width = `${Math.max(220, LEFT + Math.max(columns, 1) * CELL + 20)}px`;
+        } else if (kind === 'subsequence') {
+          const match = greedySubsequenceMatches(top, bottom);
+          match.positions.forEach((pos, i) => topPositions.set(pos, top[i]));
+          for (let i = match.positions.length; i < top.length; i++) {
+            topPositions.set(bottom.length + i - match.positions.length, top[i]);
+          }
+          for (let i = 0; i < bottom.length; i++) bottomPositions.set(i, bottom[i]);
+          columns = Math.max(bottom.length, ...Array.from(topPositions.keys(), x => x + 1), 0);
+          const nextWidth = Math.max(220, LEFT + Math.max(columns, 1) * CELL + 20);
+          svg.setAttribute('viewBox', `0 0 ${nextWidth} 186`);
+          svg.setAttribute('width', nextWidth);
+          svg.style.width = `${nextWidth}px`;
+        }
+
+        if (columns === 0) {
+          addText(svg, width / 2, 96, '（どちらも空文字列）', 'empty-note');
+          return;
+        }
+
+        for (const [column, topChar] of topPositions.entries()) {
+          const x = xAt(column);
+          const hasBottom = bottomPositions.has(column);
+          const bottomChar = bottomPositions.get(column);
+          addCircle(svg, x, 40);
+          addText(svg, x, 40, topChar, 'svg-character');
+          if (hasBottom) {
+            const shouldCircleBottom = kind === 'equal' || kind === 'prefix' || kind === 'suffix' || kind === 'substring' || kind === 'subsequence';
+            if (shouldCircleBottom) addCircle(svg, x, 150);
+            addText(svg, x, 150, bottomChar, 'svg-character');
+          } else {
+            addCircle(svg, x, 150, true);
+          }
+          const same = hasBottom && topChar === bottomChar;
+          addArrow(svg, x, 62, 128, same ? '○' : '×', markerId);
+        }
+
+        for (const [column, bottomChar] of bottomPositions.entries()) {
+          if (!topPositions.has(column)) addText(svg, xAt(column), 150, bottomChar, 'svg-character');
+        }
+
+        // 同一文字列だけは、説明どおり両向き矢印にする。
+        if (bidirectional) {
+          // 上記の片矢印を両向きに置き換えるため、各対応位置に逆向きの線を重ねる。
+          // 見た目は両端に矢印があることが分かるよう、SVG markerを先頭にも付ける。
+          const lines = svg.querySelectorAll('.svg-arrow');
+          lines.forEach(line => line.setAttribute('marker-start', `url(#${markerId})`));
+        }
+      }
+
+      function getIdempotentLayout(top, bottom) {
+        const runs = compressRuns(top);
+        const pattern = runs.map(run => run.char);
+        const match = greedySubsequenceMatches(pattern, bottom);
+        const matchedCount = match.positions.length;
+        const runColumns = Array(runs.length).fill(null);
+        const bottomColumns = Array(bottom.length).fill(null);
+
+        if (matchedCount === 0) {
+          for (let i = 0; i < bottom.length; i++) bottomColumns[i] = i;
+          let cursor = bottom.length;
+          for (let j = 0; j < runs.length; j++) {
+            runColumns[j] = cursor;
+            cursor += runs[j].length;
+          }
+          return { runs, runColumns, bottomColumns, matchedCount, columns: Math.max(cursor, bottom.length) };
+        }
+
+        // 圧縮文字に対応するBの文字を貪欲に選び、その位置をAの圧縮行に揃える。
+        runColumns[0] = match.positions[0];
+        for (let j = 1; j < matchedCount; j++) {
+          const extraBottomChars = match.positions[j] - match.positions[j - 1] - 1;
+          const requiredGap = Math.max(runs[j - 1].length, extraBottomChars + 1);
+          runColumns[j] = runColumns[j - 1] + requiredGap;
+        }
+
+        const firstMatch = match.positions[0];
+        for (let i = 0; i < firstMatch; i++) bottomColumns[i] = runColumns[0] - (firstMatch - i);
+        for (let j = 0; j < matchedCount; j++) {
+          const bIndex = match.positions[j];
+          bottomColumns[bIndex] = runColumns[j];
+          const nextMatch = j + 1 < matchedCount ? match.positions[j + 1] : bottom.length;
+          for (let i = bIndex + 1; i < nextMatch; i++) {
+            bottomColumns[i] = runColumns[j] + (i - bIndex);
+          }
+        }
+
+        const lastBottomColumn = bottomColumns.reduce((max, value) => Math.max(max, value ?? -1), -1);
+        // Bの末尾だけでなく、Aの最後に対応したrun全体の右端も越えてから、未対応runを配置する。
+        // これによりAの長い連続文字runが、B末尾の点線円や後続runと重ならない。
+        const lastMatchedRunEnd = runColumns[matchedCount - 1] + runs[matchedCount - 1].length;
+        let cursor = Math.max(lastBottomColumn + 1, lastMatchedRunEnd);
+        for (let j = matchedCount; j < runs.length; j++) {
+          runColumns[j] = cursor;
+          cursor += runs[j].length;
+        }
+        const maxColumn = Math.max(cursor - 1, ...bottomColumns.filter(Number.isFinite), -1);
+        return { runs, runColumns, bottomColumns, matchedCount, columns: maxColumn + 1 };
+      }
+
+      function addArrowFromBraceTipToCircle(svg, startX, startY, centerX, centerY, radius, color) {
+        const dx = centerX - startX;
+        const dy = centerY - startY;
+        const length = Math.hypot(dx, dy);
+        if (!length) return;
+        const ux = dx / length;
+        const uy = dy / length;
+        // 矢印の先端を、波括弧の先端と円の中心を結ぶ線分と円周との交点に置く。
+        const tipX = centerX - ux * radius;
+        const tipY = centerY - uy * radius;
+        const headLength = 9;
+        const headHalfWidth = 4;
+        const baseX = tipX - ux * headLength;
+        const baseY = tipY - uy * headLength;
+        const px = -uy;
+        const py = ux;
+        const wing1X = baseX + px * headHalfWidth;
+        const wing1Y = baseY + py * headHalfWidth;
+        const wing2X = baseX - px * headHalfWidth;
+        const wing2Y = baseY - py * headHalfWidth;
+        svg.appendChild(makeSvgElement('line', {
+          x1: startX, y1: startY, x2: baseX, y2: baseY,
+          fill: 'none', stroke: color, 'stroke-width': 1.8,
+          'stroke-linecap': 'round'
+        }));
+        svg.appendChild(makeSvgElement('path', {
+          d: `M ${tipX} ${tipY} L ${wing1X} ${wing1Y} L ${wing2X} ${wing2Y} Z`,
+          fill: color, stroke: color, 'stroke-width': 1
+        }));
+      }
+
+      function addBrace(svg, startColumn, runLength, y, compressedY) {
+        if (runLength < 2) return;
+        const x1 = xAt(startColumn) - 21;
+        const x2 = xAt(startColumn + runLength - 1) + 21;
+        const center = (x1 + x2) / 2;
+        const target = xAt(startColumn);
+        const d = [
+          `M ${x1} ${y}`,
+          `C ${x1} ${y + 8}, ${x1 + 6} ${y + 9}, ${x1 + 13} ${y + 9}`,
+          `L ${center - 8} ${y + 9}`,
+          `C ${center - 3} ${y + 9}, ${center - 3} ${y + 16}, ${center} ${y + 16}`,
+          `C ${center + 3} ${y + 16}, ${center + 3} ${y + 9}, ${center + 8} ${y + 9}`,
+          `L ${x2 - 13} ${y + 9}`,
+          `C ${x2 - 6} ${y + 9}, ${x2} ${y + 8}, ${x2} ${y}`
+        ].join(' ');
+        const braceColor = '#65b8c8';
+        svg.appendChild(makeSvgElement('path', {
+          d, fill: 'none', stroke: braceColor, 'stroke-width': 1.8,
+          'stroke-linecap': 'round', 'stroke-linejoin': 'round'
+        }));
+        // 波括弧の中央の先端から、対応する圧縮文字の円周まで直線矢印を引く。
+        addArrowFromBraceTipToCircle(svg, center, y + 16, target, compressedY, 19, braceColor);
+      }
+
+      function renderIdempotentDiagram(svg, top, bottom) {
+        const layout = getIdempotentLayout(top, bottom);
+        const { runs, runColumns, bottomColumns, matchedCount, columns } = layout;
+        const { width, markerId } = beginDiagram(svg, top, bottom, 300, columns);
+        const yRaw = 38, yCompressed = 126, yBottom = 258;
+
+        // Aの元の文字列。各runの文字は連続して並べ、次のrunまで最低run.length列を確保する。
+        runs.forEach((run, runIndex) => {
+          const start = runColumns[runIndex];
+          for (let offset = 0; offset < run.length; offset++) {
+            addText(svg, xAt(start + offset), yRaw, run.char, 'svg-character');
+          }
+          addBrace(svg, start, run.length, 64, yCompressed);
+          addCircle(svg, xAt(start), yCompressed);
+          addText(svg, xAt(start), yCompressed, run.char, 'svg-character');
+          const isMatched = runIndex < matchedCount;
+          if (isMatched) {
+            const bColumn = bottomColumns.find((column, index) => column === start && index >= 0);
+            if (bColumn !== undefined) {
+              addCircle(svg, xAt(start), yBottom);
+              const bIndex = bottomColumns.indexOf(start);
+              if (bIndex >= 0) addText(svg, xAt(start), yBottom, bottom[bIndex], 'svg-character');
+            }
+            addArrow(svg, xAt(start), 148, 236, '○', markerId);
+          } else {
+            addCircle(svg, xAt(start), yBottom, true);
+            addArrow(svg, xAt(start), 148, 236, '×', markerId);
+          }
+        });
+
+        // Bの文字列。Aの圧縮と対応しない文字も左寄せで詰め、必要な場所だけ空白を残す。
+        const matchedBColumns = new Set();
+        for (let i = 0; i < bottom.length; i++) {
+          const column = bottomColumns[i];
+          const isMatched = layout.runColumns.slice(0, matchedCount).includes(column);
+          if (isMatched) matchedBColumns.add(column);
+          if (!isMatched) addText(svg, xAt(column), yBottom, bottom[i], 'svg-character');
+        }
+
+        // 圧縮文字とBの対応位置には円を重ね、対応しないBの文字は素のまま表示。
+        // 対応済みのB文字は上のrun描画時に表示済み。空文字列も含め、右端が切れない幅にする。
+        if (columns === 0) addText(svg, width / 2, 160, '（どちらも空文字列）', 'empty-note');
+      }
+
+      function updateCard(card) {
+        const kind = card.dataset.kind;
+        const topValue = card.querySelector('[data-input="top"]').value;
+        const bottomValue = card.querySelector('[data-input="bottom"]').value;
+        const top = splitCharacters(topValue);
+        const bottom = splitCharacters(bottomValue);
+        const svg = card.querySelector('svg.diagram');
+        const result = card.querySelector('.result');
+        const names = {
+          equal: '同一文字列',
+          prefix: '前置部分文字列',
+          suffix: '後置部分文字列',
+          substring: '部分文字列',
+          subsequence: '部分列',
+          idempotent: '冪等部分列',
+          commutative: '可換部分列',
+          rightGap: '右gap部分列',
+          rightWeakGap: '右弱gap部分列',
+          leftGap: '左gap部分列',
+          leftWeakGap: '左弱gap部分列'
+        };
+        const gapCharset = card.querySelector('[data-gap-charset]')?.value || 'hiragana';
+        const isGapKind = kind === 'rightGap' || kind === 'rightWeakGap' || kind === 'leftGap' || kind === 'leftWeakGap';
+        const isWeakGapKind = kind === 'rightWeakGap' || kind === 'leftWeakGap';
+        const gapWitness = isGapKind
+          ? (kind === 'leftGap' || kind === 'leftWeakGap'
+              ? findLeftGapEmbedding(top, bottom, isWeakGapKind, gapCharset)
+              : findRightGapEmbedding(top, bottom, isWeakGapKind, gapCharset))
+          : null;
+        const gapSubsequence = isGapKind ? greedySubsequenceMatches(top, bottom).complete : false;
+        const valid = isGapKind ? gapWitness !== null : isRelation(kind, top, bottom);
+        let gapNote = card.querySelector('.gap-result-note');
+        if (isGapKind && !gapNote) {
+          gapNote = document.createElement('p');
+          gapNote.className = 'gap-result-note';
+          gapNote.setAttribute('aria-live', 'polite');
+          result.insertAdjacentElement('afterend', gapNote);
+        }
+
+        if (kind === 'idempotent') renderIdempotentDiagram(svg, top, bottom);
+        else if (kind === 'commutative') renderCommutativeDiagram(svg, top, bottom);
+        else if (kind === 'usedchars') renderUsedCharsDiagram(svg, top, bottom);
+        else if (kind === 'lastchar') renderLastCharDiagram(svg, top, bottom);
+        else if (isGapKind) renderGapDiagram(svg, top, bottom, kind, gapWitness, gapCharset);
+        else renderPairDiagram(svg, kind, top, bottom);
+
+        if (isGapKind) {
+          result.textContent = valid
+            ? `${topValue}は${bottomValue}の${names[kind]}です！`
+            : `${topValue}は${bottomValue}の${names[kind]}ではありません！`;
+          if (gapNote) {
+            gapNote.textContent = valid
+              ? ''
+              : (gapSubsequence
+                  ? '図は文字の選び方の一例です。他の選び方についてもgap文字の条件は成り立ちません。'
+                  : '部分列にすらなりません。');
+            gapNote.hidden = valid;
+          }
+        } else if (kind === 'lastchar') {
+          result.textContent = valid ? '末尾文字は一致してます！' : '末尾文字は一致してません！';
+        } else if (kind === 'usedchars') {
+          result.textContent = valid
+            ? `${topValue}は${bottomValue}に使用文字について包含されてます！`
+            : `${topValue}は${bottomValue}に使用文字について包含されてません！`;
+        } else {
+          result.textContent = valid
+            ? (kind === 'equal' ? '同一文字列です！' : `${topValue}は${bottomValue}の${names[kind]}です！`)
+            : (kind === 'equal' ? '同一文字列ではありません！' : `${topValue}は${bottomValue}の${names[kind]}ではありません！`);
+        }
+        result.classList.toggle('yes', valid);
+        result.classList.toggle('no', !valid);
+      }
+
+      function isAllowedGapCodePoint(char, charset) {
+        const cp = char.codePointAt(0);
+        if (charset === 'digits') return cp >= 0x30 && cp <= 0x39;
+        if (charset === 'latin') return (cp >= 0x41 && cp <= 0x5a) || (cp >= 0x61 && cp <= 0x7a);
+        if (charset === 'hiragana') {
+          return (cp >= 0x3041 && cp <= 0x3096) || (cp >= 0x309d && cp <= 0x309f);
+        }
+        if (charset === 'katakana') {
+          return (cp >= 0x30a1 && cp <= 0x30fa) || cp === 0x30fc || (cp >= 0x30fd && cp <= 0x30ff);
+        }
+        return false;
+      }
+
+      function sanitizeGapInput(value, charset) {
+        const allowed = Array.from(value.normalize('NFC')).filter(char => isAllowedGapCodePoint(char, charset));
+        const text = allowed.join('');
+        return charset === 'latin' ? text.toUpperCase() : text;
+      }
+
+      function syncGapCardInputs(card) {
+        const selector = card.querySelector('[data-gap-charset]');
+        const charset = selector.value;
+        card.querySelectorAll('[data-input]').forEach(input => {
+          const oldValue = input.value;
+          const caret = input.selectionStart;
+          const newValue = sanitizeGapInput(oldValue, charset);
+          if (oldValue !== newValue) {
+            input.value = newValue;
+            if (typeof caret === 'number' && document.activeElement === input) {
+              const safeCaret = sanitizeGapInput(oldValue.slice(0, caret), charset).length;
+              input.setSelectionRange(safeCaret, safeCaret);
+            }
+          }
+          input.inputMode = charset === 'digits' ? 'numeric' : 'text';
+          input.autocapitalize = 'off';
+        });
+        updateCard(card);
+      }
+
+
+      const RELATION_LIST = [
+        ['equal', '同一文字列'],
+        ['prefix', '前置部分文字列'],
+        ['suffix', '後置部分文字列'],
+        ['substring', '部分文字列'],
+        ['subsequence', '部分列'],
+        ['idempotent', '冪等部分列'],
+        ['commutative', '可換部分列'],
+        ['usedchars', '使用文字の包含'],
+        ['lastchar', '末尾文字の一致'],
+        ['rightGap', '右gap部分列'],
+        ['rightWeakGap', '右弱gap部分列'],
+        ['leftGap', '左gap部分列'],
+        ['leftWeakGap', '左弱gap部分列']
+      ];
+      const GAP_KINDS = new Set(['rightGap', 'rightWeakGap', 'leftGap', 'leftWeakGap']);
+      // しりとり側のgapマスクキャッシュと同様、ビット集合の推定使用量に上限を設ける。
+      const GAP_BITSET_MEMORY_LIMIT = 64 * 1024 * 1024;
+      const CHARSET_LABELS = {
+        digits: '0～9の数字',
+        latin: 'アルファベット',
+        hiragana: 'ひらがな',
+        katakana: 'カタカナ'
+      };
+
+      // 悪列判定ページの関係選択肢を、13種類まとめて判定と同じ一覧から作る。
+      const badSequenceRelationSelect = document.getElementById('bad-sequence-relation');
+      for (const [kind, name] of RELATION_LIST) {
+        const option = document.createElement('option');
+        option.value = kind;
+        option.textContent = name;
+        badSequenceRelationSelect.appendChild(option);
+      }
+      badSequenceRelationSelect.value = 'subsequence';
+
+      function detectGapCharset(valueA, valueB) {
+        const chars = Array.from((valueA + valueB).normalize('NFC'));
+        if (chars.length === 0) return 'hiragana';
+        for (const charset of ['digits', 'latin', 'hiragana', 'katakana']) {
+          if (chars.every(char => isAllowedGapCodePoint(char, charset))) return charset;
+        }
+        return null;
+      }
+
+      // Gap関係の文字順。既存判定で使っているIntl.Collatorと同じ比較器で順位表を作る。
+      function makeGapRankInfo(charset) {
+        let alphabet;
+        if (charset === 'digits') alphabet = Array.from('0123456789');
+        else if (charset === 'latin') alphabet = Array.from('ABCDEFGHIJKLMNOPQRSTUVWXYZ');
+        else if (charset === 'hiragana') {
+          alphabet = [];
+          for (let cp = 0x3041; cp <= 0x3096; cp++) alphabet.push(String.fromCodePoint(cp));
+          for (let cp = 0x309d; cp <= 0x309f; cp++) alphabet.push(String.fromCodePoint(cp));
+        } else {
+          alphabet = [];
+          for (let cp = 0x30a1; cp <= 0x30fa; cp++) alphabet.push(String.fromCodePoint(cp));
+          alphabet.push('ー');
+          for (let cp = 0x30fd; cp <= 0x30ff; cp++) alphabet.push(String.fromCodePoint(cp));
+        }
+        alphabet.sort((a, b) => compareGapCharacters(a, b, charset));
+        return { alphabet, rankMap: new Map(alphabet.map((char, index) => [char, index])) };
+      }
+
+      // 1つのパターン文字列に対するgap判定器を事前構築する。
+      // state i は「パターンの先頭i文字を選び終えた」状態を表すビット。
+      // skipMasks[r] は、順位rの文字をgapとして読み飛ばせる状態の集合。
+      function compileGapPattern(pattern, rankInfo) {
+        const matchMasks = new Map();
+        const exactMasks = new Array(rankInfo.alphabet.length).fill(0n);
+        for (let i = 0; i < pattern.length; i++) {
+          const bit = 1n << BigInt(i);
+          matchMasks.set(pattern[i], (matchMasks.get(pattern[i]) || 0n) | bit);
+          exactMasks[rankInfo.rankMap.get(pattern[i])] |= bit;
+        }
+        // 読み飛ばせる状態は文字順位に関して単調なので、累積ORで一度に作る。
+        const skipMasks = new Array(exactMasks.length).fill(0n);
+        let cumulative = 0n;
+        for (let rank = 0; rank < exactMasks.length; rank++) {
+          cumulative |= exactMasks[rank];
+          skipMasks[rank] = cumulative;
+        }
+        return {
+          length: pattern.length,
+          matchMasks,
+          skipMasks,
+          rankMap: rankInfo.rankMap,
+          doneBit: 1n << BigInt(pattern.length)
+        };
+      }
+
+      // 既存の動的計画法と同じ遷移をBigIntのビット集合でまとめて行う。
+      // reverseText=trueならBを反転して読む（左gap用）。
+      function runCompiledGapPattern(compiled, text, weak, reverseText = false) {
+        const m = compiled.length;
+        if (m === 0) return true;
+        if (m > text.length) return false;
+
+        let active = 1n; // 状態0
+        for (let step = 0; step < text.length; step++) {
+          const char = text[reverseText ? text.length - 1 - step : step];
+          const rank = compiled.rankMap.get(char);
+          const skip = compiled.skipMasks[rank];
+          const match = compiled.matchMasks.get(char) || 0n;
+          active = (active & skip) | ((active & match) << 1n);
+          if (weak) active |= 1n; // 弱gapでは先頭側のgapを無条件に読み飛ばせる
+          if (active & compiled.doneBit) return true;
+        }
+        return false;
+      }
+
+      // ビット集合の推定量が上限を超えるときの省メモリ版。文字列の分解と順位計算は再利用する。
+      function runGapDpFallback(pattern, patternRanks, text, rankMap, weak, reverseText = false) {
+        const m = pattern.length;
+        if (m === 0) return true;
+        if (m > text.length) return false;
+
+        let active = new Uint8Array(m + 1);
+        let next = new Uint8Array(m + 1);
+        active[0] = 1;
+        for (let step = 0; step < text.length; step++) {
+          next.fill(0);
+          const char = text[reverseText ? text.length - 1 - step : step];
+          const charRank = rankMap.get(char);
+          for (let i = 0; i < m; i++) {
+            if (!active[i]) continue;
+            if (char === pattern[i]) next[i + 1] = 1;
+            if (patternRanks[i] <= charRank) next[i] = 1;
+          }
+          if (weak) next[0] = 1;
+          if (next[m]) return true;
+          const swap = active;
+          active = next;
+          next = swap;
+        }
+        return false;
+      }
+
+      // 各入力行について、選択した関係で必要な情報だけを一度だけ計算する。
+      function prepareBadSequenceRows(rows, kind, charset) {
+        const isGap = GAP_KINDS.has(kind);
+        const rankInfo = isGap ? makeGapRankInfo(charset) : null;
+        const preparedRows = rows.map(raw => {
+          const value = isGap ? sanitizeGapInput(raw, charset) : raw;
+          const chars = splitCharacters(value);
+          const prepared = { raw, value, chars };
+
+          if (kind === 'idempotent') {
+            prepared.compressed = [];
+            for (const char of chars) {
+              if (prepared.compressed.length === 0 || prepared.compressed[prepared.compressed.length - 1] !== char) {
+                prepared.compressed.push(char);
+              }
+            }
+          }
+          if (kind === 'commutative') {
+            prepared.counts = new Map();
+            for (const char of chars) prepared.counts.set(char, (prepared.counts.get(char) || 0) + 1);
+          }
+          if (kind === 'usedchars') prepared.charSet = new Set(chars);
+          if (kind === 'lastchar') prepared.lastChar = chars.length ? chars[chars.length - 1] : null;
+          if (kind === 'subsequence' || kind === 'idempotent') {
+            // Bの各文字の出現位置を保持し、A側の各文字を二分探索で次の位置へ進める。
+            prepared.positionsByChar = new Map();
+            for (let i = 0; i < chars.length; i++) {
+              let positions = prepared.positionsByChar.get(chars[i]);
+              if (!positions) prepared.positionsByChar.set(chars[i], positions = []);
+              positions.push(i);
+            }
+          }
+          if (kind === 'substring') {
+            prepared.kmpPrefix = new Uint32Array(chars.length);
+            for (let i = 1, j = 0; i < chars.length; i++) {
+              while (j > 0 && chars[i] !== chars[j]) j = prepared.kmpPrefix[j - 1];
+              if (chars[i] === chars[j]) j++;
+              prepared.kmpPrefix[i] = j;
+            }
+          }
+          return prepared;
+        });
+
+        if (isGap) {
+          const isLeft = kind === 'leftGap' || kind === 'leftWeakGap';
+          let estimatedBytes = 0;
+          for (const row of preparedRows) {
+            row.gapPattern = isLeft ? [...row.chars].reverse() : row.chars;
+            row.gapRanks = row.gapPattern.map(char => rankInfo.rankMap.get(char));
+            row.gapRankMap = rankInfo.rankMap;
+            // skipマスクと文字一致マスクの最大サイズを保守的に見積もる。
+            estimatedBytes += Math.ceil((row.gapPattern.length + 1) / 8) * (2 * rankInfo.alphabet.length + 1);
+          }
+          const useBitsets = estimatedBytes <= GAP_BITSET_MEMORY_LIMIT;
+          if (useBitsets) {
+            for (const row of preparedRows) {
+              if (isLeft) row.gapLeft = compileGapPattern(row.gapPattern, rankInfo);
+              else row.gapRight = compileGapPattern(row.gapPattern, rankInfo);
+            }
+          }
+        }
+        return preparedRows;
+      }
+
+      function hasPreparedSubsequence(pattern, textRow) {
+        if (pattern.length > textRow.chars.length) return false;
+        let cursor = -1;
+        const positionsByChar = textRow.positionsByChar;
+        for (const char of pattern) {
+          const positions = positionsByChar.get(char);
+          if (!positions) return false;
+          let low = 0, high = positions.length;
+          const target = cursor + 1;
+          while (low < high) {
+            const middle = (low + high) >>> 1;
+            if (positions[middle] < target) low = middle + 1;
+            else high = middle;
+          }
+          if (low >= positions.length) return false;
+          cursor = positions[low];
+        }
+        return true;
+      }
+
+      // pattern側で事前計算したKMP表を使う。全ペアで同じ表を再利用できる。
+      function preparedSubstring(patternRow, textRow) {
+        const pattern = patternRow.chars;
+        const text = textRow.chars;
+        if (pattern.length === 0) return true;
+        if (pattern.length > text.length) return false;
+        const prefix = patternRow.kmpPrefix;
+        let matched = 0;
+        for (let i = 0; i < text.length; i++) {
+          while (matched > 0 && text[i] !== pattern[matched]) matched = prefix[matched - 1];
+          if (text[i] === pattern[matched]) matched++;
+          if (matched === pattern.length) return true;
+        }
+        return false;
+      }
+
+      function preparedRelation(kind, a, b, charset) {
+        const top = a.chars;
+        const bottom = b.chars;
+        if (kind === 'equal') {
+          if (top.length !== bottom.length) return false;
+          for (let i = 0; i < top.length; i++) if (top[i] !== bottom[i]) return false;
+          return true;
+        }
+        if (kind === 'prefix') {
+          if (top.length > bottom.length) return false;
+          for (let i = 0; i < top.length; i++) if (top[i] !== bottom[i]) return false;
+          return true;
+        }
+        if (kind === 'suffix') {
+          if (top.length > bottom.length) return false;
+          const offset = bottom.length - top.length;
+          for (let i = 0; i < top.length; i++) if (top[i] !== bottom[offset + i]) return false;
+          return true;
+        }
+        if (kind === 'substring') return preparedSubstring(a, b);
+        if (kind === 'subsequence') return hasPreparedSubsequence(top, b);
+        if (kind === 'idempotent') return hasPreparedSubsequence(a.compressed, b);
+        if (kind === 'commutative') {
+          for (const [char, count] of a.counts) if (count > (b.counts.get(char) || 0)) return false;
+          return true;
+        }
+        if (kind === 'usedchars') {
+          for (const char of a.charSet) if (!b.charSet.has(char)) return false;
+          return true;
+        }
+        if (kind === 'lastchar') {
+          return (a.lastChar === null && b.lastChar === null) || (a.lastChar !== null && b.lastChar !== null && a.lastChar === b.lastChar);
+        }
+        if (kind === 'rightGap' || kind === 'rightWeakGap') {
+          const weak = kind === 'rightWeakGap';
+          return a.gapRight
+            ? runCompiledGapPattern(a.gapRight, bottom, weak)
+            : runGapDpFallback(a.gapPattern, a.gapRanks, bottom, a.gapRankMap, weak);
+        }
+        if (kind === 'leftGap' || kind === 'leftWeakGap') {
+          const weak = kind === 'leftWeakGap';
+          return a.gapLeft
+            ? runCompiledGapPattern(a.gapLeft, bottom, weak, true)
+            : runGapDpFallback(a.gapPattern, a.gapRanks, bottom, a.gapRankMap, weak, true);
+        }
+        return false;
+      }
+
+      const badSequenceInput = document.getElementById('bad-sequence-input');
+      const badSequenceLineNumbers = document.getElementById('bad-sequence-line-numbers');
+      const badSequenceGapCharsetWrap = document.getElementById('bad-sequence-gap-charset-wrap');
+      const badSequenceGapCharset = document.getElementById('bad-sequence-gap-charset');
+      const badSequenceResult = document.getElementById('bad-sequence-result');
+      const antichainResult = document.getElementById('antichain-result');
+
+      function updateBadSequenceLineNumbers() {
+        const lineCount = badSequenceInput.value.replace(/\r\n?/g, '\n').split('\n').length;
+        badSequenceLineNumbers.replaceChildren();
+        for (let i = 1; i <= lineCount; i++) {
+          const line = document.createElement('span');
+          line.textContent = String(i);
+          badSequenceLineNumbers.appendChild(line);
+        }
+        badSequenceLineNumbers.scrollTop = badSequenceInput.scrollTop;
+      }
+
+      function clearBadSequenceResults() {
+        for (const element of [badSequenceResult, antichainResult]) {
+          element.textContent = '';
+          element.classList.remove('yes', 'no');
+        }
+      }
+
+      function updateBadSequenceRelationControls() {
+        badSequenceGapCharsetWrap.hidden = !GAP_KINDS.has(badSequenceRelationSelect.value);
+        clearBadSequenceResults();
+      }
+
+      function getBadSequenceRows() {
+        const value = badSequenceInput.value.replace(/\r\n?/g, '\n');
+        return value === '' ? [] : value.split('\n');
+      }
+
+      function findBadSequenceWitness(preparedRows, kind, charset) {
+        for (let i = 0; i < preparedRows.length; i++) {
+          const a = preparedRows[i];
+          for (let j = i + 1; j < preparedRows.length; j++) {
+            if (preparedRelation(kind, a, preparedRows[j], charset)) return { from: i, to: j };
+          }
+        }
+        return null;
+      }
+
+      // 反鎖では、異なる2行のどちら向きにも関係が成り立たないことを確認する。
+      function findAntichainViolation(preparedRows, kind, charset) {
+        for (let i = 0; i < preparedRows.length; i++) {
+          const a = preparedRows[i];
+          for (let j = i + 1; j < preparedRows.length; j++) {
+            const b = preparedRows[j];
+            if (preparedRelation(kind, a, b, charset)) return { from: i, to: j };
+            if (preparedRelation(kind, b, a, charset)) return { from: j, to: i };
+          }
+        }
+        return null;
+      }
+
+      function describeRelationWitness(witness, rows, kind) {
+        const a = rows[witness.from];
+        const b = rows[witness.to];
+        const m = witness.from + 1;
+        const n = witness.to + 1;
+        const name = RELATION_LIST.find(([candidate]) => candidate === kind)?.[1] || '文字列関係';
+
+        if (kind === 'equal') {
+          return `${m}行目の「${a}」と${n}行目の「${b}」は同一文字列になってる！`;
+        }
+        if (kind === 'lastchar') {
+          return `${m}行目の「${a}」と${n}行目の「${b}」は末尾文字が一致してる！`;
+        }
+        if (kind === 'usedchars') {
+          return `${m}行目の「${a}」に使われている文字は${n}行目の「${b}」に全て含まれてる！`;
+        }
+        return `${m}行目の「${a}」は${n}行目の「${b}」の${name}になってる！`;
+      }
+
+      function setBadSequenceResult(element, message, positive) {
+        element.textContent = message;
+        element.classList.toggle('yes', positive);
+        element.classList.toggle('no', !positive);
+      }
+
+      function validateBadSequenceGapRows(rows, charset) {
+        for (let i = 0; i < rows.length; i++) {
+          const chars = Array.from(rows[i].normalize('NFC'));
+          if (!chars.every(char => isAllowedGapCodePoint(char, charset))) return i;
+        }
+        return -1;
+      }
+
+      function runBadSequenceCheck(checkAntichain) {
+        const rows = getBadSequenceRows();
+        const kind = badSequenceRelationSelect.value;
+        const isGap = GAP_KINDS.has(kind);
+        const charset = isGap ? badSequenceGapCharset.value : null;
+        const resultElement = checkAntichain ? antichainResult : badSequenceResult;
+
+        if (rows.length < 2) {
+          setBadSequenceResult(resultElement, '判定するには2行以上入力してください。', false);
+          return;
+        }
+
+        if (isGap) {
+          const invalidRow = validateBadSequenceGapRows(rows, charset);
+          if (invalidRow >= 0) {
+            setBadSequenceResult(
+              resultElement,
+              `${invalidRow + 1}行目に選択した文字集合に含まれない文字があります。${CHARSET_LABELS[charset]}だけを入力してください。`,
+              false
+            );
+            return;
+          }
+        }
+
+        // 行ごとの分解・出現数・圧縮列・KMP表・gap判定器を一度だけ作り、全ペアで使い回す。
+        const preparedRows = prepareBadSequenceRows(rows, kind, charset);
+
+        if (checkAntichain) {
+          const violation = findAntichainViolation(preparedRows, kind, charset);
+          if (violation) {
+            setBadSequenceResult(
+              resultElement,
+              `${describeRelationWitness(violation, rows, kind)}反鎖ではない！良いね！！`,
+              false
+            );
+          } else {
+            const name = RELATION_LIST.find(([candidate]) => candidate === kind)?.[1] || '文字列';
+            setBadSequenceResult(resultElement, `どこにも「${name}」関係がない！反鎖だ！！`, true);
+          }
+        } else {
+          const witness = findBadSequenceWitness(preparedRows, kind, charset);
+          if (witness) {
+            setBadSequenceResult(
+              resultElement,
+              `${describeRelationWitness(witness, rows, kind)}良いね！！`,
+              true
+            );
+          } else {
+            const name = RELATION_LIST.find(([candidate]) => candidate === kind)?.[1] || '文字列';
+            setBadSequenceResult(resultElement, `どこにも「${name}」関係がない！悪い！！`, false);
+          }
+        }
+      }
+
+      badSequenceInput.addEventListener('input', () => {
+        updateBadSequenceLineNumbers();
+        clearBadSequenceResults();
+      });
+      badSequenceInput.addEventListener('scroll', () => {
+        badSequenceLineNumbers.scrollTop = badSequenceInput.scrollTop;
+      });
+      badSequenceRelationSelect.addEventListener('change', updateBadSequenceRelationControls);
+      badSequenceGapCharset.addEventListener('change', clearBadSequenceResults);
+      document.getElementById('bad-sequence-run').addEventListener('click', () => runBadSequenceCheck(false));
+      document.getElementById('antichain-run').addEventListener('click', () => runBadSequenceCheck(true));
+      updateBadSequenceLineNumbers();
+      updateBadSequenceRelationControls();
+
+      function updateBatchResults() {
+        const valueA = document.getElementById('batch-a').value;
+        const valueB = document.getElementById('batch-b').value;
+        const charset = detectGapCharset(valueA, valueB);
+        const results = document.getElementById('batch-results');
+        const warning = document.getElementById('batch-gap-warning');
+        const caption = document.getElementById('batch-gap-caption');
+        results.replaceChildren();
+        results.hidden = false;
+        warning.hidden = !!charset;
+        caption.hidden = !charset;
+        caption.textContent = charset ? `gap系の文字集合：${CHARSET_LABELS[charset]}` : '';
+
+        for (const [kind, name] of RELATION_LIST) {
+          const isGap = GAP_KINDS.has(kind);
+          const valid = isGap && !charset ? null : evaluateRelation(kind, valueA, valueB, charset);
+          const row = document.createElement('div');
+          row.className = 'batch-result-row' + (valid === null ? ' unavailable' : '');
+          const link = document.createElement('a');
+          link.className = 'batch-result-link';
+          link.href = `#relation-${kind}`;
+          link.dataset.kind = kind;
+          link.textContent = name;
+          const status = document.createElement('span');
+          status.className = 'batch-status' + (valid === null ? '' : valid ? ' yes' : ' no');
+          status.textContent = valid === null ? '対象外' : valid ? '成立' : '不成立';
+          row.append(link, status);
+          results.appendChild(row);
+        }
+      }
+
+      function setCardValues(card, valueA, valueB, gapCharset) {
+        const selector = card.querySelector('[data-gap-charset]');
+        if (selector) {
+          if (gapCharset) selector.value = gapCharset;
+          card.querySelector('[data-input="top"]').value = sanitizeGapInput(valueA, selector.value);
+          card.querySelector('[data-input="bottom"]').value = sanitizeGapInput(valueB, selector.value);
+          updateCard(card);
+        } else {
+          card.querySelector('[data-input="top"]').value = valueA;
+          card.querySelector('[data-input="bottom"]').value = valueB;
+          updateCard(card);
+        }
+      }
+
+      // 一括判定の関係名から、対応する個別説明・図へ移動する。
+      document.getElementById('batch-results').addEventListener('click', event => {
+        const link = event.target.closest('a[data-kind]');
+        if (!link) return;
+        const kind = link.dataset.kind;
+        const card = document.getElementById(`relation-${kind}`);
+        if (!card) return;
+        const valueA = document.getElementById('batch-a').value;
+        const valueB = document.getElementById('batch-b').value;
+        const charset = detectGapCharset(valueA, valueB);
+        if (!GAP_KINDS.has(kind) || charset) setCardValues(card, valueA, valueB, charset);
+      });
+
+      document.getElementById('batch-run').addEventListener('click', updateBatchResults);
+      document.getElementById('batch-swap').addEventListener('click', () => {
+        const a = document.getElementById('batch-a');
+        const b = document.getElementById('batch-b');
+        [a.value, b.value] = [b.value, a.value];
+        if (!document.getElementById('batch-results').hidden) updateBatchResults();
+      });
+
+      document.querySelectorAll('.relation-card[data-kind]').forEach(card => {
+        const swap = card.querySelector('[data-swap-card]');
+        if (swap) {
+          swap.addEventListener('click', () => {
+            const a = card.querySelector('[data-input="top"]');
+            const b = card.querySelector('[data-input="bottom"]');
+            [a.value, b.value] = [b.value, a.value];
+            const selector = card.querySelector('[data-gap-charset]');
+            if (selector) syncGapCardInputs(card);
+            else updateCard(card);
+          });
+        }
+        const selector = card.querySelector('[data-gap-charset]');
+        if (selector) {
+          selector.addEventListener('change', () => syncGapCardInputs(card));
+          card.querySelectorAll('input[data-input]').forEach(input => {
+            input.addEventListener('input', event => {
+              if (event.isComposing) return;
+              const charset = selector.value;
+              const oldValue = input.value;
+              const caret = input.selectionStart;
+              const newValue = sanitizeGapInput(oldValue, charset);
+              if (oldValue !== newValue) {
+                input.value = newValue;
+                if (typeof caret === 'number') {
+                  const safeCaret = sanitizeGapInput(oldValue.slice(0, caret), charset).length;
+                  input.setSelectionRange(safeCaret, safeCaret);
+                }
+              }
+              updateCard(card);
+            });
+            input.addEventListener('compositionend', () => syncGapCardInputs(card));
+          });
+          syncGapCardInputs(card);
+        } else {
+          card.querySelectorAll('input').forEach(input => {
+            input.addEventListener('input', () => updateCard(card));
+          });
+          updateCard(card);
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
