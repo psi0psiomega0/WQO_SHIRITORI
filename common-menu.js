@@ -16,7 +16,7 @@
     {
       title: '文字列同士の関係',
       href: 'relations.html',
-      available: false,
+      available: true,
       description: '文字列同士の関係を判定し、図で確認するページです。'
     },
     {
