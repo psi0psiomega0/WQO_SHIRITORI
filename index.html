@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="ja">
 <head>
+  <link rel="stylesheet" href="common-menu.css">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f5f1e9">
@@ -72,9 +73,64 @@
     .settings-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
     .settings-title { margin: 0; font-size: 14px; font-weight: 800; letter-spacing: .04em; }
     .settings-note { margin: 0; color: var(--muted); font-size: 11px; }
+    .ruleset-tools { margin: 0 0 16px; padding: 12px; border: 1px solid #e0e6dc; border-radius: 12px; background: #f7f8f3; }
+    .ruleset-tools-title { margin: 0 0 8px; color: #5d6d60; font-size: 12px; font-weight: 800; }
+    .ruleset-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+    .ruleset-name, .ruleset-select { min-height: 37px; min-width: 0; padding: 7px 9px; border: 1px solid #dcded5; border-radius: 9px; color: var(--ink); background: white; font-size: 12px; }
+    .ruleset-name { flex: 1 1 150px; }
+    .ruleset-select { flex: 1 1 170px; }
+    .ruleset-save-button { border-color: var(--green); color: white; background: var(--green); font-weight: 750; }
+    .ruleset-save-button:hover:not(:disabled) { border-color: var(--green-dark); background: var(--green-dark); }
+    .ruleset-load-button { border-color: #607d99; color: white; background: #607d99; font-weight: 750; }
+    .ruleset-load-button:hover:not(:disabled) { border-color: #4b657e; background: #4b657e; }
+    .ruleset-delete-button { border-color: #d7b9ad; color: #9a6048; background: #fffaf7; }
+    .ruleset-help { margin: 7px 0 0; color: #92988f; font-size: 10px; line-height: 1.6; }
+    .ruleset-controls button:disabled, .ruleset-controls select:disabled { opacity: .4; cursor: not-allowed; }
+    .opening-sequence-choice, .opening-sequence-editor { flex: 1 0 100%; margin-top: 10px; padding: 13px; border: 1px solid #dfe7dc; border-radius: 12px; background: #fffefa; }
+    .opening-sequence-choice[hidden], .opening-sequence-editor[hidden] { display: none !important; }
+    .opening-sequence-question { margin: 0 0 10px; color: #526b5b; font-size: 13px; font-weight: 800; text-align: center; }
+    .opening-sequence-explain { margin: 0 0 10px; color: #657468; font-size: 11px; line-height: 1.75; }
+    .opening-sequence-textarea { display: block; width: 100%; min-height: 130px; padding: 10px 12px; border: 1px solid #dcded5; border-radius: 10px; color: var(--ink); background: white; font: 13px/1.65 ui-monospace, SFMono-Regular, Consolas, monospace; resize: vertical; }
+    .opening-sequence-count-toggle { display: flex; align-items: center; gap: 8px; margin: 10px 0 0; color: #5d6d60; font-size: 12px; font-weight: 750; cursor: pointer; }
+    .opening-sequence-count-toggle input { width: 15px; height: 15px; margin: 0; accent-color: var(--green); }
+    .opening-sequence-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 11px; }
+    .opening-sequence-action { min-height: 39px; padding: 8px 14px; border: 1px solid #d5ded3; border-radius: 9px; color: #526b5b; background: #f6f8f3; font-size: 12px; font-weight: 750; cursor: pointer; }
+    .opening-sequence-action.primary { border-color: var(--green); color: white; background: var(--green); }
+    .opening-sequence-action:disabled { opacity: .4; cursor: not-allowed; }
     .settings-section + .settings-section { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
     .settings-section[hidden] { display: none; }
     .settings-section-title { margin: 0 0 10px; color: #657468; font-size: 12px; font-weight: 800; letter-spacing: .03em; }
+    .settings-disclosure > .settings-section-title {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 0;
+      padding: 2px 28px 2px 0;
+      cursor: pointer;
+      list-style: none;
+      user-select: none;
+    }
+    .settings-disclosure > .settings-section-title::-webkit-details-marker { display: none; }
+    .settings-disclosure > .settings-section-title::after {
+      content: "＋";
+      position: absolute;
+      right: 2px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #829087;
+      font-size: 17px;
+      font-weight: 500;
+    }
+    .settings-disclosure[open] > .settings-section-title { margin-bottom: 14px; }
+    .settings-disclosure[open] > .settings-section-title::after { content: "−"; }
+    .settings-disclosure > .settings-section-title:focus-visible {
+      outline: 2px solid #8aa894;
+      outline-offset: 4px;
+      border-radius: 3px;
+    }
+
     .settings-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
     .setting-field { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
     .setting-field[hidden] { display: none; }
@@ -186,6 +242,8 @@
     .history-save-button:hover:not(:disabled) { border-color: var(--green-dark); background: var(--green-dark); }
     .history-load-button { border-color: #c77b4e; color: white; background: #c77b4e; font-weight: 750; }
     .history-load-button:hover:not(:disabled) { border-color: #a9633d; background: #a9633d; }
+.history-markdown-button { border-color: #607d99; color: white; background: #607d99; font-weight: 750; }
+    .history-markdown-button:hover:not(:disabled) { border-color: #4b657e; background: #4b657e; }
     .history-save-note { margin: -5px 0 10px; color: #657468; font-size: 11px; line-height: 1.7; }
     .history-note { margin: -7px 0 12px; color: #92988f; font-size: 11px; }
     .history-item.rule-violation { border-color: #d9a29b; background: #fff3f1; }
@@ -228,13 +286,14 @@
   </style>
 </head>
 <body>
+  <div id="site-menu"></div>
+  <script src="common-menu.js" defer></script>
   <div class="page">
     <header>
       <div class="eyebrow">BAD SEQUENCE SHIRITORI GAME</div>
       <h1>悪いしりとり</h1>
       <p class="subtitle">既に出た文字列を部分列にもたないように文字列を並べよう！</p>
       <p class="subtitle">お手本プレイ・1人プレイ・最大10人対戦ができたり色んな文字列上の関係で遊べます。</p>
-
     </header>
 
     <noscript><p style="padding:14px; border:1px solid #d9a29b; border-radius:12px; background:#fff4f1; color:#8b3d36; text-align:center;">このしりとりを遊ぶにはJavaScriptが必要です。ファイルをダウンロードし、SafariやChromeなどのブラウザで開いてください。</p></noscript>
@@ -267,8 +326,23 @@
           <h2 class="settings-title">文字集合と判定ルール</h2>
           <p class="settings-note">文字集合・文字の扱い・禁止条件を順に設定できます</p>
         </div>
+        <section class="ruleset-tools" aria-label="ルールセットの保存と読み込み">
+          <h3 class="ruleset-tools-title">ルールセット</h3>
+          <div class="ruleset-controls">
+            <input class="ruleset-name" id="rulePresetName" type="text" maxlength="40" autocomplete="off" placeholder="保存する名前">
+            <button class="sub-button ruleset-save-button" id="saveRulePresetButton" type="button">ルールセットを保存</button>
+            <select class="ruleset-select" id="rulePresetSelect" aria-label="保存済みルールセット">
+              <option value="">保存済みルールセットはありません</option>
+            </select>
+            <button class="sub-button ruleset-load-button" id="loadRulePresetButton" type="button" disabled>読み込む</button>
+            <button class="sub-button ruleset-delete-button" id="deleteRulePresetButton" type="button" disabled>削除</button>
+          </div>
+          <p class="ruleset-help">設定だけを最大100件まで保存できます。保存は対局中も可能ですが、読み込みはゲーム開始前に限ります。</p>
+        </section>
         <section class="settings-section" aria-label="文字集合の指定">
-          <h3 class="settings-section-title">文字集合の指定</h3>
+          <details class="settings-disclosure">
+            <summary class="settings-section-title">文字集合の指定</summary>
+            <div class="settings-section-body">
           <div class="settings-grid">
             <label class="setting-field" for="characterSet">
               <span class="setting-label">文字集合</span>
@@ -307,10 +381,14 @@
               </div>
             </div>
           </div>
-        </section>
+        
+            </div>
+          </details></section>
 
         <section class="settings-section" id="kanaSettingsGroup" aria-label="ひらがなの扱いの指定">
-          <h3 class="settings-section-title">ひらがなの扱いの指定</h3>
+          <details class="settings-disclosure">
+            <summary class="settings-section-title">ひらがなの扱いの指定</summary>
+            <div class="settings-section-body">
           <div class="settings-grid">
             <label class="setting-field" for="longRule">
               <span class="setting-label">伸ばし棒「ー」の処理</span>
@@ -348,10 +426,14 @@
               <p class="setting-help" id="tsuRuleHelp">「っ」を「つ」にする／直前の文字と一まとまりにする／取り除く、のいずれかを選べます。</p>
             </label>
           </div>
-        </section>
+        
+            </div>
+          </details></section>
 
         <section class="settings-section" aria-label="禁止条件の指定">
-          <h3 class="settings-section-title">禁止条件の指定</h3>
+          <details class="settings-disclosure" open>
+            <summary class="settings-section-title">禁止条件の指定</summary>
+            <div class="settings-section-body">
           <div class="settings-grid">
             <label class="setting-field" for="nRule">
               <span class="setting-label">末尾「ん」禁止</span>
@@ -388,10 +470,14 @@
               </select>
             </label>
           </div>
-        </section>
+        
+            </div>
+          </details></section>
 
         <section class="settings-section" aria-label="文字列長と接続の制限">
-          <h3 class="settings-section-title">文字列長と接続の制限</h3>
+          <details class="settings-disclosure">
+            <summary class="settings-section-title">文字列長と接続の制限</summary>
+            <div class="settings-section-body">
           <div class="settings-grid">
             <label class="setting-field" for="minLengthFunction">
               <span class="setting-label">文字列長の下限</span>
@@ -413,7 +499,9 @@
           <div class="function-preview" id="functionPreview">iは1始まりのターン番号です。下限・上限は実数値で計算した後、それぞれfloorで整数化します。f(1)は使わず、f(i)は第i−1ターン目と第iターン目の間（i≧2）に適用します。</div>
           <p class="setting-help" style="margin-top:8px">式では i、+ − * / ^、小数、括弧、min、max、abs、floor、ceil、sqrt、exp(a,b)、log(a,b)、root(a,n)、slog(a) を使用できます。exp(a,b)=a^b、log(a,b)=log_a(b)、root(a,n)=aのn乗根です。slogは底2のテトレーションの逆関数を連続化した関数で、0≤x<1ではx−1、x≥1では1+slog(log₂x)とします。長さの下限・上限と接続文字数は、実数計算後にfloorで整数化します。式は安全な数式として解析し、JavaScriptコードとしては実行しません。</p>
           <p class="setting-help">例：下限と上限をどちらも <code>i+1</code>、接続文字数を <code>i</code> にすると、第iターン目はi+1文字で、前ターンの末尾i文字と接続します。</p>
-        </section>
+        
+            </div>
+          </details></section>
 
         <p class="settings-lock" id="settingsLock">判定設定は対局開始後に固定されます。変更する場合は「最初からやり直す」を押してください。</p>
       </section>
@@ -422,6 +510,28 @@
         <div class="start-panel" id="startPanel">
           <p class="start-note">プレイヤー名とルールを設定したら、ゲームを開始してください。</p>
           <button class="start-button" id="startGameButton" type="button">ゲーム開始</button>
+          <div class="opening-sequence-choice" id="openingSequenceChoice" hidden>
+            <p class="opening-sequence-question">最初の数手を指定しますか？</p>
+            <div class="opening-sequence-actions">
+              <button class="opening-sequence-action primary" id="openingSequenceYesButton" type="button">はい</button>
+              <button class="opening-sequence-action" id="openingSequenceNoButton" type="button">いいえ</button>
+            </div>
+          </div>
+          <div class="opening-sequence-editor" id="openingSequenceEditor" hidden>
+            <p class="opening-sequence-explain">文字列を改行して入力すると、ルール違反していないかの判定がなされて、ルール違反がなければ序盤の手として一括で反映されます。下のチェックボックスでこれらもターン数に含めるかを指定できます。</p>
+            <textarea class="opening-sequence-textarea" id="openingSequenceInput" spellcheck="false" placeholder="しりとり
+りんご
+ごりら"></textarea>
+            <label class="opening-sequence-count-toggle" for="openingSequenceCountTurns">
+              <input id="openingSequenceCountTurns" type="checkbox">
+              <span>序盤の指定もターン数に含める</span>
+            </label>
+            <p class="opening-sequence-explain">ターン数に含めない場合、指定した文字列の長さ制限と、指定文字列同士の接続条件は確認しません。ただし、最初の実プレイは最後の指定文字列に接続し、f(1)を適用します。</p>
+            <div class="opening-sequence-actions">
+              <button class="opening-sequence-action primary" id="openingSequenceStartButton" type="button">この内容で開始</button>
+              <button class="opening-sequence-action" id="openingSequenceBackButton" type="button">戻る</button>
+            </div>
+          </div>
         </div>
         <div class="demo-controls" id="demoControls" hidden>
           <p class="demo-note">各お手本アルゴリズムに従って悪列を生成します。一度に進める手数に固定上限はありません。</p>
@@ -496,6 +606,9 @@
             <span class="history-count" id="historyCount">0 WORDS</span>
             <button class="sub-button history-save-button" id="downloadGameSaveButton" type="button" disabled>履歴を保存</button>
             <button class="sub-button history-load-button" id="loadGameSaveButton" type="button">履歴を読み込む</button>
+            <button class="sub-button history-markdown-button" id="downloadMarkdownHistoryButton" type="button" disabled>Markdownで出力</button>
+            <button class="sub-button" id="copyAllWordsButton" type="button" disabled>文字列の履歴のみをコピー</button>
+            <button class="sub-button" id="copyValidWordsButton" type="button" disabled>有効な文字列のみをコピー</button>
             <input id="loadGameSaveInput" type="file" accept=".json,application/json" hidden>
           </div>
         </div>
@@ -560,7 +673,10 @@
         demoAlphabetSequence: null,
         demoCommutativeSequence: null,
         autoInsertConnection: false,
-        autoInsertedPrefix: ''
+        autoInsertedPrefix: '',
+        openingSequenceUsed: false,
+        openingSequenceCountsAsTurns: false,
+        openingSequenceLength: 0
       };
 
       const smallToLarge = {
@@ -665,6 +781,11 @@
           joinLengthFunction: $('joinLengthFunction').value.trim()
         };
       }
+      function getCountedValidTurnCount() {
+        return state.words.reduce((count, entry) => count + (entry.isOpeningSequence && !entry.openingSequenceCounted ? 0 : 1), 0);
+      }
+      function getNextGameTurnIndex() { return getCountedValidTurnCount() + 1; }
+      function getOpeningSequenceEntries() { return state.words.filter(entry => entry.isOpeningSequence); }
       // 関数入力はJavaScriptとして実行せず、実数式の字句解析・構文解析を行う。
       // iは1始まりのターン番号。Number（IEEE 754倍精度浮動小数点数）で評価し、
       // 長さ・接続文字数に使う際にfloorを適用してBigIntへ変換する。
@@ -2339,10 +2460,10 @@
       function getCurrentTurnLengthRange(rules, turnNumber) {
         const bounds = readLengthBounds(rules, turnNumber);
         if (bounds.impossible) return { possible: false, reason: bounds.impossible };
-        const overlap = turnNumber > 1
+        const previous = state.words.length ? state.words[state.words.length - 1] : null;
+        const overlap = previous
           ? evaluateRuleFunction(rules.joinLengthFunction, turnNumber, '接続文字数', 0n)
           : 0n;
-        const previous = turnNumber > 1 ? state.words[state.words.length - 1] : null;
         const effectiveOverlap = isDemoMode() && previous && overlap > BigInt(previous.units.length)
           ? BigInt(previous.units.length)
           : overlap;
@@ -2381,15 +2502,16 @@
       function describeConstraintFunctions() {
         const preview = $('functionPreview');
         const rules = currentRules();
-        const i = state.words.length + 1;
+        const i = getNextGameTurnIndex();
         try {
           const currentBounds = readLengthBounds(rules, i);
-          const overlap = i === 1 ? 0n : evaluateRuleFunction(rules.joinLengthFunction, i, '接続文字数', 0n);
+          const overlap = state.words.length ? evaluateRuleFunction(rules.joinLengthFunction, i, '接続文字数', 0n) : 0n;
           const nextOverlap = evaluateRuleFunction(rules.joinLengthFunction, i + 1, '接続文字数', 0n);
           const currentMin = currentBounds.min === null ? 'なし' : currentBounds.min.toString();
           const currentMax = currentBounds.max === null ? 'なし' : currentBounds.max.toString();
           preview.classList.remove('error');
-          preview.textContent = `現在は第${i}ターン目：下限 ${currentMin}、上限 ${currentMax}（いずれも実数評価後にfloor）。${i === 1 ? '初手のため' : `前の単語と`} ${overlap} 文字を接続します。次ターンの接続文字数は ${nextOverlap} 文字です。iは1始まり。`;
+          const connectionDescription = state.words.length ? `前の文字列と${overlap}文字を接続します。` : `前の文字列がないため、現在の接続文字数は${overlap}文字です。`;
+          preview.textContent = `現在は第${i}ターン目：下限 ${currentMin}、上限 ${currentMax}（いずれも実数評価後にfloor）。${connectionDescription}次ターンの接続文字数は ${nextOverlap} 文字です。iは1始まり。`;
         } catch (error) {
           preview.classList.add('error');
           preview.textContent = `関数式を確認してください：${error.message}`;
@@ -2564,17 +2686,22 @@
         item.className = `history-item${entry.foul ? ' rule-violation' : ''}`;
         item.dataset.player = String(entry.player);
         item.dataset.foul = entry.foul ? 'true' : 'false';
+        item.dataset.openingSequence = entry.isOpeningSequence ? 'true' : 'false';
         item.dataset.reason = entry.foulReason || '';
         if (entry.display !== entry.memo) item.title = `入力：${entry.display} ／ 判定用の記録：${entry.memo}`;
         const number = document.createElement('span');
         number.className = 'number';
-        number.textContent = `第${entry.turnIndex}ターン`;
+        number.textContent = entry.isOpeningSequence
+          ? (entry.openingSequenceCounted ? `第${entry.turnIndex}ターン（序盤指定）` : `序盤指定 ${entry.openingSequenceIndex}`)
+          : `第${entry.turnIndex}ターン`;
         const word = document.createElement('span');
         word.className = 'word';
         word.textContent = entry.memo;
         const owner = document.createElement('span');
         owner.className = 'owner';
-        owner.textContent = entry.foul ? `${nameOf(entry.player)} · 反則：${entry.foulReason}` : nameOf(entry.player);
+        owner.textContent = entry.isOpeningSequence
+          ? '序盤の指定'
+          : entry.foul ? `${nameOf(entry.player)} · 反則：${entry.foulReason}` : nameOf(entry.player);
 
         const rules = currentRules();
         let remaining = null;
@@ -2584,7 +2711,7 @@
         if (!entry.foul && rules.showRemainingTurns) {
           if (rules.ending === 'last') {
             const alphabetSpec = getOrderTypeAlphabetSpec(rules);
-            if (alphabetSpec.valid) remainingFormula = BigInt(alphabetSpec.chars.length - entry.turnIndex);
+            if (alphabetSpec.valid) remainingFormula = BigInt(alphabetSpec.chars.length - (entry.orderTypeIndex || entry.turnIndex));
           } else if (rules.ending === 'alphabet'
               && typeof entry.remainingOrderType === 'bigint') {
             remainingFormula = entry.remainingOrderType;
@@ -2629,7 +2756,10 @@
         item.append(owner);
         const selectRewindTurn = () => {
           if ($('rewindPanel').hidden) return;
-          $('rewindTurnInput').value = String(entry.turnIndex);
+          const targetTurn = entry.isOpeningSequence
+            ? (entry.openingSequenceCounted ? entry.turnIndex : 1)
+            : entry.turnIndex;
+          $('rewindTurnInput').value = String(targetTurn);
           $('historyList').querySelectorAll('.history-item').forEach(node => node.classList.remove('selected-for-rewind'));
           item.classList.add('selected-for-rewind');
           updateRewindPanelValidity();
@@ -2644,7 +2774,9 @@
         list.append(item);
         if (!$('rewindPanel').hidden) {
           setHistoryItemRewindSelectable(item, true);
-          item.setAttribute('aria-label', `第${entry.turnIndex}ターンからやり直す位置に指定`);
+          item.setAttribute('aria-label', entry.isOpeningSequence
+            ? `序盤指定${entry.openingSequenceIndex}を起点に戻す位置に指定`
+            : `第${entry.turnIndex}ターンからやり直す位置に指定`);
         }
         if (remaining) renderRemainingTurnsMath(
           remaining.querySelector('.remaining-math'), remainingFormula, remainingDescription, remainingFallback
@@ -2658,7 +2790,8 @@
       function getMaximumRewindTurn() {
         if (!state.started) return 0;
         // 対局中は現在の手番より前まで。終了時は最後の反則が起きた手番からの再開も許可する。
-        return state.finished ? state.words.length + 1 : state.words.length;
+        const countedTurns = getCountedValidTurnCount();
+        return state.finished ? countedTurns + 1 : countedTurns;
       }
       function updateRewindPanelValidity() {
         const input = $('rewindTurnInput');
@@ -2679,14 +2812,16 @@
         $('rewindConfirmButton').disabled = Boolean(error) || state.demoBatchRunning;
       }
       function openRewindPanel() {
-        if (!state.started || !state.history.length || state.demoBatchRunning) return;
+        if (!state.started || getMaximumRewindTurn() < 1 || state.demoBatchRunning) return;
         $('rewindPanel').hidden = false;
         $('rewindTurnInput').value = '';
         setHistoryItemsRewindSelectable(true);
         $('historyList').querySelectorAll('.history-item').forEach(item => item.classList.remove('selected-for-rewind'));
         $('historyList').querySelectorAll('.history-item').forEach((item, index) => {
           const entry = state.history[index];
-          if (entry) item.setAttribute('aria-label', `第${entry.turnIndex}ターンからやり直す位置に指定`);
+          if (entry) item.setAttribute('aria-label', entry.isOpeningSequence
+            ? `序盤指定${entry.openingSequenceIndex}を起点に戻す位置に指定`
+            : `第${entry.turnIndex}ターンからやり直す位置に指定`);
         });
         updateRewindPanelValidity();
         $('rewindTurnInput').focus();
@@ -2701,14 +2836,7 @@
         if (!state.history.length) return null;
         const removed = state.history.pop();
         removeLastHistoryEntry();
-        state.turn = removed.player;
-        if (removed.foul) {
-          state.activePlayers[removed.player] = true;
-          if (state.eliminationOrder[state.eliminationOrder.length - 1] === removed.player) state.eliminationOrder.pop();
-          else state.eliminationOrder = state.eliminationOrder.filter(player => player !== removed.player);
-          if (!removed.automatic) state.playerCounts[removed.player] = Math.max(0, state.playerCounts[removed.player] - 1);
-          releaseEntryCache(removed);
-        } else {
+        if (removed.isOpeningSequence) {
           const validRemoved = state.words.pop();
           if (validRemoved && validRemoved.alphabetFamilyChange && state.alphabetOrderContext) {
             undoAlphabetSetFromFamily(validRemoved, state.alphabetOrderContext);
@@ -2729,7 +2857,43 @@
           if (validRemoved && validRemoved.indexed && state.fastLookup.get(validRemoved.indexKey) === validRemoved) {
             state.fastLookup.delete(validRemoved.indexKey);
           }
-          state.playerCounts[removed.player] = Math.max(0, state.playerCounts[removed.player] - 1);
+          state.openingSequenceLength = Math.max(0, state.openingSequenceLength - 1);
+          if (state.openingSequenceLength === 0) {
+            state.openingSequenceUsed = false;
+            state.openingSequenceCountsAsTurns = false;
+          }
+          state.turn = 0;
+        } else {
+          state.turn = removed.player;
+          if (removed.foul) {
+            state.activePlayers[removed.player] = true;
+            if (state.eliminationOrder[state.eliminationOrder.length - 1] === removed.player) state.eliminationOrder.pop();
+            else state.eliminationOrder = state.eliminationOrder.filter(player => player !== removed.player);
+            if (!removed.automatic) state.playerCounts[removed.player] = Math.max(0, state.playerCounts[removed.player] - 1);
+            releaseEntryCache(removed);
+          } else {
+            const validRemoved = state.words.pop();
+            if (validRemoved && validRemoved.alphabetFamilyChange && state.alphabetOrderContext) {
+              undoAlphabetSetFromFamily(validRemoved, state.alphabetOrderContext);
+            }
+            if (validRemoved && validRemoved.commutativeFamilyChange && state.commutativeOrderContext) {
+              undoCommutativeVectorFromFamily(validRemoved);
+            }
+            if (validRemoved && Object.prototype.hasOwnProperty.call(validRemoved, 'subsequenceLanguageBefore')
+                && state.subsequenceOrderContext) {
+              state.subsequenceLanguage = validRemoved.subsequenceLanguageBefore;
+              delete validRemoved.subsequenceLanguageBefore;
+              if (Object.prototype.hasOwnProperty.call(validRemoved, 'subsequencePruningOccurredBefore')) {
+                state.subsequencePruningOccurred = validRemoved.subsequencePruningOccurredBefore;
+                delete validRemoved.subsequencePruningOccurredBefore;
+              }
+            }
+            releaseEntryCache(validRemoved);
+            if (validRemoved && validRemoved.indexed && state.fastLookup.get(validRemoved.indexKey) === validRemoved) {
+              state.fastLookup.delete(validRemoved.indexKey);
+            }
+            state.playerCounts[removed.player] = Math.max(0, state.playerCounts[removed.player] - 1);
+          }
         }
         if (Array.isArray(state.demoAlphabetSequence)) {
           state.demoAlphabetSequence = state.demoAlphabetSequence.slice(0, state.words.length + 1);
@@ -2777,9 +2941,11 @@
         $('historyList').querySelectorAll('.history-item').forEach(item => {
           const player = Number(item.dataset.player);
           const owner = item.querySelector('.owner');
-          if (owner) owner.textContent = item.dataset.foul === 'true'
-            ? `${nameOf(player)} · 反則：${item.dataset.reason}`
-            : nameOf(player);
+          if (owner) owner.textContent = item.dataset.player === '-1'
+            ? '序盤の指定'
+            : item.dataset.foul === 'true'
+              ? `${nameOf(player)} · 反則：${item.dataset.reason}`
+              : nameOf(player);
         });
       }
 
@@ -4228,11 +4394,11 @@
         if (!finishIfOneRemains(entry.player)) state.turn = nextActivePlayer(entry.player);
       }
       function currentMoveAvailability(rules) {
-        const turnIndex = state.words.length + 1;
-        const overlap = turnIndex > 1
+        const turnIndex = getNextGameTurnIndex();
+        const previous = state.words.length ? state.words[state.words.length - 1] : null;
+        const overlap = previous
           ? evaluateRuleFunction(rules.joinLengthFunction, turnIndex, '接続文字数', 0n)
           : 0n;
-        const previous = state.words.length ? state.words[state.words.length - 1] : null;
         return readNextTurnAvailability(rules, turnIndex, previous ? previous.units : [], overlap);
       }
       function eliminateBlockedPlayers(rules) {
@@ -4253,7 +4419,7 @@
             display: '（有効な手なし）',
             memo: '（有効な手なし）',
             player,
-            turnIndex: state.words.length + 1,
+            turnIndex: getNextGameTurnIndex(),
             foulReason: availability.reason,
             conflictWith: null
           };
@@ -4339,6 +4505,9 @@
           ? '対局中のため判定設定と参加人数は変更できません。変更する場合は「最初からやり直す」を押してください。'
           : 'ゲーム開始前は判定設定と参加人数を変更できます。';
         $('startPanel').hidden = settingsLocked;
+        $('rulePresetSelect').disabled = settingsLocked || $('rulePresetSelect').options.length <= 1;
+        $('loadRulePresetButton').disabled = settingsLocked || !$('rulePresetSelect').value;
+        $('deleteRulePresetButton').disabled = !$('rulePresetSelect').value;
         const startNote = $('startPanel').querySelector('.start-note');
         if (startNote) startNote.textContent = isDemoMode()
           ? `${demoEndingLabel(currentRules().ending)}のお手本アルゴリズムを選択しました。設定確認後、ゲームを開始してください。`
@@ -4369,7 +4538,7 @@
           $('playerCount' + i).textContent = isDemoMode()
             ? `${state.words.length}手生成`
             : isSoloMode()
-              ? (state.finished ? `敗北 · ${state.words.length}ターン成功` : `${state.words.length}ターン成功`)
+              ? (state.finished ? `敗北 · ${getCountedValidTurnCount()}ターン成功` : `${getCountedValidTurnCount()}ターン成功`)
               : state.activePlayers[i]
                 ? `${state.playerCounts[i]} 回参加`
                 : `脱落 · ${state.playerCounts[i]} 回参加`;
@@ -4403,7 +4572,7 @@
             const reason = finalEvent && finalEvent.foulReason ? `\n終了理由：${finalEvent.foulReason}` : '';
             $('endDetail').textContent = `${validTurns}ターンの悪列を生成しました（次の${validTurns + 1}手目で終了）。${reason}`;
           } else if (state.endReason === 'solo-foul') {
-            const validTurns = state.words.length;
+            const validTurns = getCountedValidTurnCount();
             const finalEvent = state.history[state.history.length - 1];
             $('turnCaption').textContent = 'CHALLENGE FINISHED';
             $('turnTitle').textContent = 'チャレンジ終了！';
@@ -4425,7 +4594,7 @@
             $('endPanel').classList.add('show');
             $('endTitle').textContent = state.winner === null ? '勝者なし' : `${nameOf(state.winner)} が最後まで残りました！`;
             const lastLoser = state.loser;
-            const validTurns = state.words.length;
+            const validTurns = getCountedValidTurnCount();
             const ranking = getRanking().map((player, index) => `${index + 1}位　${nameOf(player)}`).join('\n');
             const ending = lastLoser === null ? '' : `${validTurns}ターン目まで続いた！（${validTurns + 1}ターン目で${nameOf(lastLoser)}が脱落）`;
             const finalEvent = state.history[state.history.length - 1];
@@ -4435,7 +4604,7 @@
         } else {
           $('turnCaption').textContent = isDemoMode()
             ? `第${state.words.length + 1}ターン目 · MODEL PLAY`
-            : isSoloMode() ? `第${state.words.length + 1}ターン目 · SOLO CHALLENGE` : `第${state.words.length + 1}ターン目 · ${currentName} の番`;
+            : isSoloMode() ? `第${getNextGameTurnIndex()}ターン目 · SOLO CHALLENGE` : `第${getNextGameTurnIndex()}ターン目 · ${currentName} の番`;
           $('turnTitle').textContent = isDemoMode()
             ? 'CPUのお手本プレイ'
             : isSoloMode() ? '悪列を続けましょう' : `${currentName} の番です`;
@@ -4463,8 +4632,8 @@
         } else {
           $('wordInput').placeholder = previous ? (previous.nextJoinCount ? `「${previous.next}」から始まる文字列` : '接続制限なしで入力') : '文字列を入力';
         }
-        $('undoButton').disabled = state.history.length === 0 || state.demoBatchRunning;
-        $('rewindButton').disabled = !state.started || state.history.length === 0 || state.demoBatchRunning;
+        $('undoButton').disabled = !state.history.some(entry => !entry.isOpeningSequence) || state.demoBatchRunning;
+        $('rewindButton').disabled = !state.started || getMaximumRewindTurn() < 1 || state.demoBatchRunning;
         if (!$('rewindPanel').hidden) updateRewindPanelValidity();
         const orderTypeCalculationConfigured = state.started
           && (['alphabet', 'commutative'].includes(remainingRule) || subsequenceOrderApplicable || idempotentOrderApplicable)
@@ -4474,8 +4643,11 @@
         $('orderTypeCalculationStoppedNote').textContent = state.orderTypeStopReason || '順序型の計算は停止しました。このゲーム中は再開できません。';
         syncConnectionInput();
         const foulCount = state.history.filter(entry => entry.foul).length;
-        $('historyCount').textContent = `${state.words.length} 有効ターン · ${foulCount} 反則`;
+        $('historyCount').textContent = `${getCountedValidTurnCount()} 有効ターン · ${foulCount} 反則`;
         $('downloadGameSaveButton').disabled = !state.started;
+        $('downloadMarkdownHistoryButton').disabled = !state.started;
+        $('copyAllWordsButton').disabled = !state.started || !state.history.some(entry => !entry.automatic && String(entry.memo || '').length);
+        $('copyValidWordsButton').disabled = !state.started || !state.words.some(entry => String(entry.memo || '').length);
       }
 
       function validateGameSettings() {
@@ -4624,13 +4796,20 @@
             endReason: state.endReason,
             autoInsertConnection: state.autoInsertConnection,
             orderTypeCalculationStopped: state.orderTypeCalculationStopped,
-            orderTypeStopReason: state.orderTypeStopReason
+            orderTypeStopReason: state.orderTypeStopReason,
+            openingSequenceUsed: state.openingSequenceUsed,
+            openingSequenceCountsAsTurns: state.openingSequenceCountsAsTurns,
+            openingSequenceLength: state.openingSequenceLength
           },
           history: state.history.map(entry => ({
             display: String(entry.display ?? entry.memo ?? ''),
             memo: String(entry.memo ?? ''),
             player: entry.player,
             turnIndex: entry.turnIndex,
+            orderTypeIndex: Number.isSafeInteger(entry.orderTypeIndex) ? entry.orderTypeIndex : entry.turnIndex,
+            isOpeningSequence: Boolean(entry.isOpeningSequence),
+            openingSequenceIndex: Number.isSafeInteger(entry.openingSequenceIndex) ? entry.openingSequenceIndex : null,
+            openingSequenceCounted: Boolean(entry.openingSequenceCounted),
             foul: Boolean(entry.foul),
             automatic: Boolean(entry.automatic),
             ruleViolation: Boolean(entry.ruleViolation),
@@ -4709,14 +4888,31 @@
         for (const key of ['autoInsertConnection']) {
           if (typeof savedState[key] !== 'boolean') throw new Error('入力設定の保存内容が正しくありません。');
         }
+        if (savedState.openingSequenceUsed !== undefined && typeof savedState.openingSequenceUsed !== 'boolean') {
+          throw new Error('序盤指定の保存内容が正しくありません。');
+        }
+        if (savedState.openingSequenceCountsAsTurns !== undefined && typeof savedState.openingSequenceCountsAsTurns !== 'boolean') {
+          throw new Error('序盤指定のターン数設定が正しくありません。');
+        }
+        if (savedState.openingSequenceLength !== undefined
+            && (!Number.isSafeInteger(savedState.openingSequenceLength) || savedState.openingSequenceLength < 0 || savedState.openingSequenceLength > 10000)) {
+          throw new Error('序盤指定の件数が正しくありません。');
+        }
         if (!Array.isArray(data.history) || data.history.length > 1000000) {
           throw new Error('履歴の件数が不正、または上限を超えています。');
         }
         for (const [index, entry] of data.history.entries()) {
+          const isOpeningSequenceEntry = Boolean(entry && entry.isOpeningSequence);
+          const validPlayer = isOpeningSequenceEntry
+            ? entry.player === -1
+            : Number.isInteger(entry?.player) && entry.player >= 0 && entry.player < playerLength;
+          const validTurnIndex = isOpeningSequenceEntry
+            ? Number.isSafeInteger(entry.turnIndex) && entry.turnIndex >= 0
+            : Number.isSafeInteger(entry?.turnIndex) && entry.turnIndex >= 1;
           if (!isPlainObject(entry) || typeof entry.memo !== 'string' || typeof entry.display !== 'string'
-              || !Number.isInteger(entry.player) || entry.player < 0 || entry.player >= playerLength
-              || !Number.isSafeInteger(entry.turnIndex) || entry.turnIndex < 1
-              || typeof entry.foul !== 'boolean') {
+              || !validPlayer || !validTurnIndex || typeof entry.foul !== 'boolean'
+              || (isOpeningSequenceEntry && (!Number.isSafeInteger(entry.openingSequenceIndex) || entry.openingSequenceIndex < 1
+                || typeof entry.openingSequenceCounted !== 'boolean'))) {
             throw new Error(`履歴の${index + 1}件目が正しくありません。`);
           }
           if (entry.memo.length > 1000000 || entry.display.length > 1000000) {
@@ -4773,6 +4969,9 @@
         state.winner = data.state.winner;
         state.loser = data.state.loser;
         state.endReason = data.state.endReason ?? null;
+        state.openingSequenceUsed = Boolean(data.state.openingSequenceUsed);
+        state.openingSequenceCountsAsTurns = Boolean(data.state.openingSequenceCountsAsTurns);
+        state.openingSequenceLength = Number.isSafeInteger(data.state.openingSequenceLength) ? data.state.openingSequenceLength : 0;
         state.autoInsertConnection = data.state.autoInsertConnection;
         state.autoInsertedPrefix = '';
         state.demoBatchRunning = false;
@@ -4797,6 +4996,10 @@
             memo: saved.memo,
             player: saved.player,
             turnIndex: saved.turnIndex,
+            orderTypeIndex: Number.isSafeInteger(saved.orderTypeIndex) ? saved.orderTypeIndex : saved.turnIndex,
+            isOpeningSequence: Boolean(saved.isOpeningSequence),
+            openingSequenceIndex: Number.isSafeInteger(saved.openingSequenceIndex) ? saved.openingSequenceIndex : null,
+            openingSequenceCounted: Boolean(saved.openingSequenceCounted),
             foul: saved.foul,
             ruleViolation: Boolean(saved.ruleViolation || saved.foul),
             automatic: Boolean(saved.automatic),
@@ -4846,6 +5049,416 @@
         render();
       }
 
+      function markdownCell(value) {
+        return String(value ?? '')
+          .replace(/\\/g, '\\\\')
+          .replace(/\|/g, '\\|')
+          .replace(/\r?\n/g, ' ')
+          .replace(/`/g, '\\`');
+      }
+
+      function getMarkdownOrderType(entry, rules) {
+        if (!rules.showRemainingTurns) return null;
+        switch (rules.ending) {
+          case 'alphabet':
+            return typeof entry.remainingOrderType === 'bigint'
+              ? entry.remainingOrderType.toString()
+              : null;
+          case 'commutative':
+            return Array.isArray(entry.commutativeOrderUpperBound)
+              ? formatCommutativeOrderEstimate(entry.commutativeOrderUpperBound).plain
+              : null;
+          case 'subsequence':
+            return entry.subsequenceOrderTypeUpperBound?.plain || null;
+          case 'idempotent':
+            return entry.idempotentOrderTypeResult?.plain || null;
+          default:
+            return null;
+        }
+      }
+
+      function getMarkdownFoulReason(entry, previousHistory, rules) {
+        const originalReason = String(entry.foulReason || '').trim();
+        if (entry.automatic) {
+          return originalReason
+            ? `有効な手なし：${originalReason.replace(/[。．]+$/, '')}`
+            : '有効な手がありません';
+        }
+
+        if (entry.conflictWith !== null && entry.conflictWith !== undefined) {
+          const conflict = previousHistory.find(item => !item.foul && item.memo === entry.conflictWith);
+          const conflictTurn = conflict?.isOpeningSequence
+            ? `序盤指定${conflict.openingSequenceIndex}`
+            : `第${conflict?.turnIndex ?? '?'}ターン目`;
+          const quotedWord = `${conflictTurn}の文字列「${entry.conflictWith}」`;
+          const relationLabels = {
+            same: '同一文字列',
+            prefix: '前置部分文字列',
+            suffix: '後置部分文字列',
+            substring: '部分文字列',
+            subsequence: '部分列',
+            idempotent: '冪等部分列',
+            commutative: '可換部分列',
+            alphabet: '使用文字の包含',
+            rightGap: '右gap部分列',
+            rightWeakGap: '右弱gap部分列',
+            leftGap: '左gap部分列',
+            leftWeakGap: '左弱gap部分列'
+          };
+          if (rules.ending === 'last') {
+            const lastUnit = entry.units?.[entry.units.length - 1] || Array.from(entry.memo || '').at(-1) || '';
+            return `末尾が「${lastUnit}」（${quotedWord}と末尾文字が一致）`;
+          }
+          if (rules.ending === 'same') return `${quotedWord}と同一`;
+          if (rules.reciprocal === 'mutual' && reciprocalApplicable.has(rules.ending)) {
+            return `${quotedWord}との${relationLabels[rules.ending] || '禁止条件'}関係（相互モード）`;
+          }
+          if (rules.ending === 'alphabet') return `${quotedWord}の使用文字をすべて含む`;
+          if (rules.ending === 'commutative') return `${quotedWord}を可換部分列として含む`;
+          if (rules.ending === 'idempotent') return `${quotedWord}を冪等部分列として含む`;
+          if (relationLabels[rules.ending]) return `${quotedWord}を${relationLabels[rules.ending]}として含む`;
+        }
+
+        if (originalReason.includes('「ん」で終わっています')) return '末尾が「ん」';
+        if (originalReason.includes('先頭に伸ばし棒「ー」')) return '先頭が伸ばし棒「ー」';
+        if (originalReason.includes('記録できる文字がありません')) return '正規化後に文字がありません';
+        if (originalReason.includes('gap比較用データが安全なメモリ上限')) return 'gap比較用データのメモリ上限超過';
+        return originalReason.replace(/[。．]+$/, '') || 'ルール違反';
+      }
+
+      function getMarkdownTurnConditions(turnNumber, previousValid, rules) {
+        let bounds;
+        try {
+          bounds = readLengthBounds(rules, turnNumber);
+        } catch (error) {
+          return { length: `算出できません：${error.message}`, connection: '算出できません' };
+        }
+
+        let overlap = 0n;
+        let connection = turnNumber === 1 ? 'なし（初手）' : 'なし';
+        if (previousValid) {
+          try {
+            if (Number.isSafeInteger(previousValid.nextJoinCount) && previousValid.nextJoinCount > 0) {
+              overlap = BigInt(previousValid.nextJoinCount);
+            } else {
+              overlap = evaluateRuleFunction(rules.joinLengthFunction, turnNumber, '接続文字数', 0n);
+              // お手本プレイでは、初期ランプ中に直前語の長さを超える接続数を要求しない。
+              if (Number($('playerCountSetting').value) === 0 && overlap > BigInt(previousValid.units.length)) {
+                overlap = BigInt(previousValid.units.length);
+              }
+            }
+            if (overlap > 0n) {
+              if (overlap > BigInt(previousValid.units.length)) {
+                connection = `接続不能（直前の有効な文字列が必要な${overlap}文字より短い）`;
+              } else {
+                const count = Number(overlap);
+                const required = previousValid.units.slice(previousValid.units.length - count).join('');
+                connection = `先頭${count}文字を「${required}」に一致（直前の有効な文字列の末尾）`;
+              }
+            }
+          } catch (error) {
+            connection = `算出できません：${error.message}`;
+          }
+        }
+
+        if (bounds.impossible) {
+          return { length: `宣言可能な長さなし（${bounds.impossible}）`, connection };
+        }
+        if (previousValid && overlap > BigInt(previousValid.units.length)) {
+          return { length: '宣言可能な長さなし（接続条件を満たせません）', connection };
+        }
+        const effectiveMin = maxBigInt(bounds.min === null ? 1n : bounds.min, overlap, 1n);
+        if (bounds.max !== null && effectiveMin > bounds.max) {
+          return { length: `宣言可能な長さなし（最低${effectiveMin}文字、上限${bounds.max}文字）`, connection };
+        }
+        const showMinimum = bounds.min !== null || overlap > 0n;
+        return {
+          length: formatLengthRange(showMinimum ? effectiveMin : null, bounds.max),
+          connection
+        };
+      }
+
+      function buildMarkdownGameHistory() {
+        if (!state.started) throw new Error('ゲーム開始後にMarkdownを出力できます。');
+        const rules = currentRules();
+        const playerCount = Number($('playerCountSetting').value);
+        const orderColumn = rules.showRemainingTurns
+          && ['alphabet', 'commutative', 'subsequence', 'idempotent'].includes(rules.ending);
+        const characterSetLabels = {
+          hiragana: 'ひらがな',
+          latin: 'ラテンアルファベット（A～Z）',
+          digits: '数字（0～9）',
+          custom: `ユーザー定義（${rules.customAlphabet}）`
+        };
+        const endingLabel = $('endingRule').selectedOptions[0]?.textContent.replace(/^\d+\.\s*/, '') || rules.ending;
+        const playMode = playerCount === 0
+          ? `お手本プレイ（ルール違反確認：${isDemoRuleValidationEnabled() ? 'あり' : 'なし'}）`
+          : playerCount === 1 ? '1人プレイ' : `${playerCount}人プレイ`;
+        const lines = [
+          '# しりとりゲーム記録',
+          '',
+          `- 出力日時：${new Date().toLocaleString('ja-JP')}`,
+          `- プレイ形式：${playMode}`,
+          `- 状態：${state.finished ? '終了' : '進行中'}`,
+          `- 文字集合：${characterSetLabels[rules.characterSet] || rules.characterSet}`,
+          `- 禁止条件：${endingLabel}`,
+          `- 相互モード：${reciprocalApplicable.has(rules.ending) ? (rules.reciprocal === 'mutual' ? '有効' : '無効') : '対象外'}`,
+          `- 末尾「ん」禁止：${rules.n === 'forbid' ? '有効' : '無効'}`,
+          `- 文字列長の下限：${rules.minLengthFunction || '指定なし'}`,
+          `- 文字列長の上限：${rules.maxLengthFunction || '指定なし'}`,
+          `- 接続文字数：${rules.joinLengthFunction || '指定なし（0として扱う）'}`
+        ];
+        lines.push(`- 最初の数手の指定：${state.openingSequenceUsed ? `あり（${state.openingSequenceLength}件）` : 'なし'}`);
+        if (state.openingSequenceUsed) {
+          lines.push(`- 序盤指定をターン数に含める：${state.openingSequenceCountsAsTurns ? 'はい' : 'いいえ'}`);
+          lines.push(state.openingSequenceCountsAsTurns
+            ? `- 序盤指定が占めるターン：第1～${state.openingSequenceLength}ターン`
+            : '- 序盤指定が占めるターン：なし（ターン数に含めない）');
+        }
+        if (rules.characterSet === 'hiragana') {
+          lines.push(`- 伸ばし棒：${$('longRule').selectedOptions[0]?.textContent || rules.long}`);
+          lines.push(`- 濁点・半濁点：${$('dakutenRule').selectedOptions[0]?.textContent || rules.dakuten}`);
+          lines.push(`- 小さい文字：${$('smallRule').selectedOptions[0]?.textContent || rules.small}`);
+          lines.push(`- 小さい「っ」：${$('tsuRule').selectedOptions[0]?.textContent || rules.tsu}`);
+        }
+        if (rules.showRemainingTurns && ['subsequence', 'idempotent'].includes(rules.ending) && rules.enableSubsequenceShortening) {
+          lines.push(`- 計算短縮の閾値：${rules.subsequenceShorteningThreshold}`);
+        }
+        if (state.orderTypeCalculationStopped) {
+          lines.push(`- 順序型計算：停止（${state.orderTypeStopReason || '停止済み'}）`);
+        } else if (orderColumn) {
+          lines.push('- 順序型計算：有効');
+        }
+        if (state.finished) {
+          if (state.winner !== null && state.winner !== undefined) {
+            lines.push(`- 勝者：${nameOf(state.winner)}`);
+          } else if (state.loser !== null && state.loser !== undefined) {
+            lines.push(`- 最後に反則したプレイヤー：${nameOf(state.loser)}`);
+          }
+        }
+        lines.push('', '## ことばの記録', '');
+
+        const headers = ['ターン数', 'プレイヤー', 'そのターンで宣言可能な文字列長の範囲', 'そのターンの接続条件', '文字列'];
+        if (orderColumn) headers.push('残りの順序型');
+        lines.push(`| ${headers.join(' | ')} |`);
+        lines.push(`| ${headers.map(() => '---').join(' | ')} |`);
+
+        let previousValid = null;
+        for (let index = 0; index < state.history.length; index++) {
+          const entry = state.history[index];
+          const conditions = entry.isOpeningSequence && !entry.openingSequenceCounted
+            ? { length: '対象外（ターン数に含めない）', connection: '対象外（指定文字列同士の接続条件を適用しない）' }
+            : getMarkdownTurnConditions(entry.turnIndex, previousValid, rules);
+          let word = String(entry.memo ?? entry.display ?? '');
+          if (entry.foul) {
+            const reason = getMarkdownFoulReason(entry, state.history.slice(0, index), rules);
+            word = entry.automatic
+              ? `有効な手なし（${reason.replace(/^有効な手なし：?/, '')}）`
+              : `${word}（${reason}）`;
+          }
+          const cells = [
+            entry.isOpeningSequence
+              ? (entry.openingSequenceCounted ? `第${entry.turnIndex}ターン（序盤指定）` : `序盤指定${entry.openingSequenceIndex}（ターン数外）`)
+              : `第${entry.turnIndex}ターン`,
+            entry.isOpeningSequence ? '序盤の指定' : nameOf(entry.player),
+            conditions.length,
+            conditions.connection,
+            word
+          ];
+          if (orderColumn) {
+            const result = entry.foul ? null : getMarkdownOrderType(entry, rules);
+            cells.push(result || (entry.foul ? '—' : '未計算'));
+          }
+          lines.push(`| ${cells.map(markdownCell).join(' | ')} |`);
+          if (!entry.foul) previousValid = entry;
+        }
+
+        if (!state.history.length) lines.push('（まだ文字列の記録はありません。）');
+        lines.push('');
+        if (state.playerNames.length > 1) {
+          lines.push('## プレイヤーの状況', '');
+          state.playerNames.forEach((name, index) => {
+            const status = state.activePlayers[index] ? '参加中' : '脱落';
+            lines.push(`- ${name}：${status}、${state.playerCounts[index]}回参加`);
+          });
+          if (state.eliminationOrder.length) {
+            lines.push('', `脱落順：${state.eliminationOrder.map(index => nameOf(index)).join(' → ')}`);
+          }
+          lines.push('');
+        }
+        return `${lines.join('\n')}\n`;
+      }
+
+      const RULE_PRESET_STORAGE_KEY = 'bad-sequence-shiritori-rule-presets-v1';
+      const MAX_RULE_PRESETS = 100;
+      function readRulePresets() {
+        try {
+          const raw = localStorage.getItem(RULE_PRESET_STORAGE_KEY);
+          if (!raw) return [];
+          const parsed = JSON.parse(raw);
+          if (!Array.isArray(parsed)) return [];
+          return parsed.filter(item => isPlainObject(item) && typeof item.name === 'string'
+            && isPlainObject(item.settings) && typeof item.playerCount === 'string'
+            && item.settings.values && isPlainObject(item.settings.values));
+        } catch (error) {
+          feedback(`保存済みルールセットを読み込めませんでした：${error.message}`);
+          return [];
+        }
+      }
+      function refreshRulePresetSelect(selectedName = '') {
+        const select = $('rulePresetSelect');
+        const presets = readRulePresets();
+        select.replaceChildren();
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = presets.length ? 'ルールセットを選択' : '保存済みルールセットはありません';
+        select.append(placeholder);
+        for (const preset of presets) {
+          const option = document.createElement('option');
+          option.value = preset.name;
+          option.textContent = preset.name;
+          select.append(option);
+        }
+        if (selectedName && presets.some(item => item.name === selectedName)) select.value = selectedName;
+        select.disabled = state.started || presets.length === 0;
+        $('loadRulePresetButton').disabled = state.started || !select.value;
+        $('deleteRulePresetButton').disabled = !select.value;
+      }
+      function createRulePreset() {
+        const name = $('rulePresetName').value.trim();
+        if (!name) return feedback('ルールセットの名前を入力してください。');
+        const presets = readRulePresets();
+        const existingIndex = presets.findIndex(item => item.name === name);
+        if (existingIndex >= 0 && !window.confirm(`「${name}」を現在の設定で上書きしますか？`)) return;
+        if (existingIndex < 0 && presets.length >= MAX_RULE_PRESETS) {
+          return feedback(`ルールセットは最大${MAX_RULE_PRESETS}件まで保存できます。不要なセットを削除してください。`);
+        }
+        const values = {};
+        for (const id of settingIds) {
+          const element = $(id);
+          values[id] = element.type === 'checkbox' ? element.checked : element.value;
+        }
+        const preset = {
+          name,
+          savedAt: new Date().toISOString(),
+          playerCount: $('playerCountSetting').value,
+          demoRuleValidation: $('demoRuleValidation').checked,
+          settings: { values }
+        };
+        if (existingIndex >= 0) presets[existingIndex] = preset;
+        else presets.push(preset);
+        try {
+          localStorage.setItem(RULE_PRESET_STORAGE_KEY, JSON.stringify(presets));
+          refreshRulePresetSelect(name);
+          feedback(`ルールセット「${name}」を保存しました。`, 'success');
+        } catch (error) {
+          feedback(`ルールセットを保存できませんでした：${error.message}`);
+        }
+      }
+      function loadSelectedRulePreset() {
+        if (state.started) return feedback('ルールセットを読み込めるのはゲーム開始前だけです。');
+        const name = $('rulePresetSelect').value;
+        const preset = readRulePresets().find(item => item.name === name);
+        if (!preset) return feedback('読み込むルールセットを選択してください。');
+        if (!window.confirm(`ルールセット「${name}」を読み込み、現在の設定を置き換えますか？ゲーム履歴は変更されません。`)) return;
+        try {
+          for (const id of settingIds) {
+            const element = $(id);
+            const value = preset.settings.values[id];
+            if (value === undefined) throw new Error(`設定「${id}」が保存データにありません。`);
+            if (element.type === 'checkbox') {
+              if (typeof value !== 'boolean') throw new Error(`設定「${id}」の形式が正しくありません。`);
+              element.checked = value;
+            } else {
+              if (typeof value !== 'string') throw new Error(`設定「${id}」の形式が正しくありません。`);
+              if (element.tagName === 'SELECT' && !Array.from(element.options).some(option => option.value === value)) {
+                throw new Error(`設定「${id}」の値「${value}」には対応していません。`);
+              }
+              element.value = value;
+            }
+          }
+          const count = String(preset.playerCount);
+          if (!['0','1','2','3','4','5','6','7','8','9','10'].includes(count)) throw new Error('参加人数の保存内容が正しくありません。');
+          $('playerCountSetting').value = count;
+          $('demoRuleValidation').checked = Boolean(preset.demoRuleValidation);
+          configurePlayerCount(count);
+          render();
+          describeRules();
+          if (!validateGameSettings()) return;
+          if (!$('openingSequenceChoice').hidden || !$('openingSequenceEditor').hidden) {
+            $('openingSequenceChoice').hidden = true;
+            $('openingSequenceEditor').hidden = true;
+            $('startGameButton').hidden = false;
+          }
+          feedback(`ルールセット「${name}」を読み込みました。ゲーム履歴は変更していません。`, 'success');
+        } catch (error) {
+          feedback(`ルールセットを読み込めませんでした：${error.message}`);
+        }
+      }
+      function deleteSelectedRulePreset() {
+        const name = $('rulePresetSelect').value;
+        if (!name) return;
+        if (!window.confirm(`ルールセット「${name}」を削除しますか？`)) return;
+        const presets = readRulePresets().filter(item => item.name !== name);
+        try {
+          localStorage.setItem(RULE_PRESET_STORAGE_KEY, JSON.stringify(presets));
+          refreshRulePresetSelect();
+          feedback(`ルールセット「${name}」を削除しました。`, 'success');
+        } catch (error) {
+          feedback(`ルールセットを削除できませんでした：${error.message}`);
+        }
+      }
+      async function copyTextToClipboard(value, successMessage) {
+        if (!value) return feedback('コピーする文字列がありません。');
+        try {
+          if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(value);
+          } else {
+            const temporary = document.createElement('textarea');
+            temporary.value = value;
+            temporary.setAttribute('readonly', '');
+            temporary.style.position = 'fixed';
+            temporary.style.opacity = '0';
+            document.body.append(temporary);
+            temporary.select();
+            const copied = document.execCommand('copy');
+            temporary.remove();
+            if (!copied) throw new Error('このブラウザではクリップボードへのコピーに対応していません。');
+          }
+          feedback(successMessage, 'success');
+        } catch (error) {
+          feedback(`コピーできませんでした：${error.message}`);
+        }
+      }
+      function copyAllWordHistory() {
+        const words = state.history.filter(entry => !entry.automatic && String(entry.memo || '').length)
+          .map(entry => String(entry.memo));
+        copyTextToClipboard(words.join('\n'), '反則手を含む文字列の履歴をコピーしました。');
+      }
+      function copyValidWordsOnly() {
+        const words = state.words.filter(entry => String(entry.memo || '').length).map(entry => String(entry.memo));
+        copyTextToClipboard(words.join('\n'), '有効な文字列だけをコピーしました。');
+      }
+
+      function downloadMarkdownGameHistory() {
+        try {
+          const markdown = buildMarkdownGameHistory();
+          const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const anchor = document.createElement('a');
+          const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+          anchor.href = url;
+          anchor.download = `bad_sequence_shiritori-${stamp}.md`;
+          document.body.append(anchor);
+          anchor.click();
+          anchor.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+          feedback('ゲーム履歴をMarkdownファイルに出力しました。', 'success');
+        } catch (error) {
+          feedback(`Markdownを出力できませんでした：${error.message}`);
+        }
+      }
+
       function downloadGameSave() {
         try {
           const data = createGameSaveData();
@@ -4884,7 +5497,7 @@
         }
       }
 
-      function startGameNow() {
+      function startGameNow(openingConfig = null) {
         closeRewindPanel();
         state.alphabetFamily = [];
         state.alphabetOrderContext = null;
@@ -4926,11 +5539,68 @@
         }
         state.started = true;
         state.turn = 0;
+        state.openingSequenceUsed = Boolean(openingConfig && openingConfig.entries && openingConfig.entries.length);
+        state.openingSequenceCountsAsTurns = Boolean(openingConfig && openingConfig.countsAsTurns);
+        state.openingSequenceLength = state.openingSequenceUsed ? openingConfig.entries.length : 0;
+        if (state.openingSequenceUsed) {
+          for (const seed of openingConfig.entries) {
+            const entry = {
+              ...seed,
+              player: -1,
+              isOpeningSequence: true,
+              openingSequenceCounted: state.openingSequenceCountsAsTurns,
+              turnIndex: state.openingSequenceCountsAsTurns ? seed.openingSequenceIndex : 0,
+              orderTypeIndex: seed.openingSequenceIndex,
+              foul: false,
+              ruleViolation: false,
+              conflictWith: null
+            };
+            if (entry.indexed) state.fastLookup.set(entry.indexKey, entry);
+            if (shouldTrackAlphabetOrderType(startRules) && state.alphabetOrderContext && entry.alphabetSet) {
+              addAlphabetSetToFamily(entry, state.alphabetOrderContext);
+            }
+            if (shouldTrackCommutativeOrderBound(startRules) && state.commutativeOrderContext && entry.unitCounts) {
+              addCommutativeVectorToFamily(entry, state.commutativeOrderContext);
+            }
+            if (shouldTrackSubsequenceOrderType(startRules) && state.subsequenceOrderContext
+                && (state.subsequenceLanguage || state.subsequenceOrderContext.idempotent)) {
+              addSubsequenceWordToLanguage(entry, state.subsequenceOrderContext);
+            }
+            state.words.push(entry);
+            state.history.push(entry);
+            if (entry.gapMaskData) state.gapMaskBytes += entry.gapMaskData.byteLength;
+            appendHistoryEntry(entry, state.history.length - 1);
+          }
+        }
         $('nonWqoWarning').hidden = true;
+        $('openingSequenceChoice').hidden = true;
+        $('openingSequenceEditor').hidden = true;
         feedback(isDemoMode() ? 'お手本モードを開始しました。続きを再生してください。' : 'ゲーム開始！', 'success');
         render();
         if (isDemoMode()) $('demoNextButton').focus();
         else $('wordInput').focus();
+      }
+      function openOpeningSequenceChoiceOrStart() {
+        $('nonWqoWarning').hidden = true;
+        if (isDemoMode()) {
+          startGameNow();
+          return;
+        }
+        $('startGameButton').hidden = true;
+        $('openingSequenceChoice').hidden = false;
+        $('openingSequenceEditor').hidden = true;
+        $('openingSequenceYesButton').focus();
+      }
+      function continueStartFlow() {
+        openOpeningSequenceChoiceOrStart();
+      }
+      function closeOpeningSequenceSetupForSettingChange() {
+        if (state.started) return;
+        if (!$('openingSequenceChoice').hidden || !$('openingSequenceEditor').hidden) {
+          $('openingSequenceChoice').hidden = true;
+          $('openingSequenceEditor').hidden = true;
+          $('startGameButton').hidden = false;
+        }
       }
       function requestStartGame() {
         if (state.started) return;
@@ -4944,7 +5614,134 @@
           $('confirmWarningButton').focus();
           return;
         }
-        startGameNow();
+        openOpeningSequenceChoiceOrStart();
+      }
+
+      function prepareOpeningSequenceEntries(rawText, countsAsTurns, rules) {
+        const rawLines = String(rawText || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+        if (!rawLines.length) return { valid: false, message: '序盤に指定する文字列を1つ以上入力してください。' };
+        if (rawLines.length > 10000 || rawLines.join('').length > 1000000) {
+          return { valid: false, message: '序盤指定が多すぎるか、入力文字列が長すぎます。' };
+        }
+        const customSpec = rules.characterSet === 'custom' ? classifyCustomAlphabet(rules.customAlphabet) : null;
+        if (customSpec && !customSpec.valid) return { valid: false, message: customSpec.message };
+        const gapInfo = isGapRule(rules.ending) ? getGapOrderInfo(rules, customSpec) : null;
+        if (gapInfo && !gapInfo.valid) return { valid: false, message: gapInfo.message };
+        const savedWords = state.words;
+        const savedFastLookup = state.fastLookup;
+        const savedGapMaskBytes = state.gapMaskBytes;
+        state.words = [];
+        state.fastLookup = new Map();
+        state.gapMaskBytes = 0;
+        const entries = [];
+        try {
+          for (let index = 0; index < rawLines.length; index++) {
+            const lineNumber = index + 1;
+            const raw = rawLines[index];
+            let display = raw;
+            let source = raw;
+            if (rules.characterSet === 'hiragana') {
+              display = raw.trim().replace(/\s+/g, '');
+              source = toHiragana(display);
+              if (!/^[\u3041-\u3096ー]+$/.test(source)) {
+                return { valid: false, message: `序盤指定${lineNumber}行目：「${raw}」にひらがな・カタカナ以外の文字があります。` };
+              }
+              if (source.startsWith('ー')) {
+                return { valid: false, message: `序盤指定${lineNumber}行目：「${raw}」は先頭に伸ばし棒「ー」を使っています。` };
+              }
+            } else if (rules.characterSet === 'latin') {
+              if (!/^[A-Za-z]+$/.test(raw)) return { valid: false, message: `序盤指定${lineNumber}行目：「${raw}」にラテンアルファベット以外の文字があります。` };
+            } else if (rules.characterSet === 'digits') {
+              if (!/^[0-9]+$/.test(raw)) return { valid: false, message: `序盤指定${lineNumber}行目：「${raw}」に半角数字以外の文字があります。` };
+            } else {
+              const allowed = new Set(customSpec.chars);
+              const invalid = Array.from(raw).find(ch => !allowed.has(ch));
+              if (invalid !== undefined) return { valid: false, message: `序盤指定${lineNumber}行目：「${invalid}」は設定した文字集合に含まれていません。` };
+            }
+            const memo = normalizeWord(source, rules);
+            if (!memo) return { valid: false, message: `序盤指定${lineNumber}行目：「${raw}」は正規化後に空文字列になります。` };
+            if (gapInfo && rules.characterSet === 'hiragana') {
+              const unsupported = Array.from(memo).find(ch => !gapInfo.rankMap.has(ch));
+              if (unsupported !== undefined) return { valid: false, message: `序盤指定${lineNumber}行目にgap部分列で使用できない文字「${unsupported}」があります。` };
+            }
+            const comparisonData = prepareComparisonData(memo, rules, gapInfo);
+            if (rules.showRemainingTurns && !state.orderTypeCalculationStopped
+                && (['last', 'alphabet', 'commutative'].includes(rules.ending) || shouldTrackSubsequenceOrderType(rules))) {
+              const alphabetSpec = getOrderTypeAlphabetSpec(rules);
+              if (alphabetSpec.valid) {
+                const allowedUnits = new Set(alphabetSpec.chars);
+                const unsupported = comparisonData.units.find(unit => !allowedUnits.has(unit));
+                if (unsupported !== undefined) return { valid: false, message: `序盤指定${lineNumber}行目に順序型計算で使用できない文字「${unsupported}」があります。` };
+              }
+            }
+            const turnIndex = countsAsTurns ? lineNumber : 0;
+            const currentLength = BigInt(comparisonData.units.length);
+            let previous = state.words.length ? state.words[state.words.length - 1] : null;
+            if (countsAsTurns) {
+              const bounds = readLengthBounds(rules, turnIndex);
+              if (bounds.impossible) return { valid: false, message: `序盤指定${lineNumber}行目：${bounds.impossible}` };
+              if (bounds.min !== null && currentLength < bounds.min) return { valid: false, message: `序盤指定${lineNumber}行目は${bounds.min}文字以上必要ですが、正規化後は${comparisonData.units.length}文字です。` };
+              if (bounds.max !== null && currentLength > bounds.max) return { valid: false, message: `序盤指定${lineNumber}行目は${bounds.max}文字以下ですが、正規化後は${comparisonData.units.length}文字です。` };
+              if (previous) {
+                const overlap = evaluateRuleFunction(rules.joinLengthFunction, turnIndex, '接続文字数', 0n);
+                if (overlap > BigInt(previous.units.length) || overlap > currentLength
+                    || !compareTailPrefix(previous.units, comparisonData.units, overlap)) {
+                  return { valid: false, message: `序盤指定${lineNumber}行目：「${memo}」が第${turnIndex}ターン目の接続条件を満たしていません。` };
+                }
+              }
+            }
+            const conflict = findConflictingEntry(comparisonData, memo, rules);
+            if (conflict) {
+              const prior = conflict.isOpeningSequence ? `序盤指定${conflict.openingSequenceIndex}` : `第${conflict.turnIndex}ターン目`;
+              return { valid: false, message: `序盤指定${lineNumber}行目：「${memo}」は${prior}の「${conflict.memo}」によって禁止条件に該当します。` };
+            }
+            const finalSound = comparisonData.units[comparisonData.units.length - 1] || '';
+            if (rules.n === 'forbid' && finalSound === 'ん') {
+              return { valid: false, message: `序盤指定${lineNumber}行目：「${memo}」は末尾が「ん」です。` };
+            }
+            let next = null;
+            let nextJoinCount = 0;
+            if (countsAsTurns || index === rawLines.length - 1) {
+              const nextTurn = countsAsTurns ? lineNumber + 1 : 1;
+              const overlapNext = evaluateRuleFunction(rules.joinLengthFunction, nextTurn, '接続文字数', 0n);
+              const availability = readNextTurnAvailability(rules, nextTurn, comparisonData.units, overlapNext);
+              next = availability.possible ? availability.requiredPrefix : null;
+              nextJoinCount = availability.possible ? availability.overlapNumber : 0;
+            }
+            const entry = {
+              display, memo, ...comparisonData,
+              player: -1, turnIndex, orderTypeIndex: lineNumber,
+              isOpeningSequence: true, openingSequenceIndex: lineNumber,
+              openingSequenceCounted: Boolean(countsAsTurns),
+              foul: false, ruleViolation: false, conflictWith: null,
+              next, nextJoinCount
+            };
+            if (rules.ending === 'same') { entry.indexed = true; entry.indexKey = memo; state.fastLookup.set(memo, entry); }
+            else if (rules.ending === 'last') { entry.indexed = true; entry.indexKey = finalSound; state.fastLookup.set(finalSound, entry); }
+            state.words.push(entry);
+            entries.push(entry);
+          }
+          return { valid: true, entries };
+        } catch (error) {
+          return { valid: false, message: `序盤指定を判定できませんでした：${error.message}` };
+        } finally {
+          state.words = savedWords;
+          state.fastLookup = savedFastLookup;
+          state.gapMaskBytes = savedGapMaskBytes;
+        }
+      }
+
+      function submitOpeningSequence() {
+        const rules = currentRules();
+        const countsAsTurns = $('openingSequenceCountTurns').checked;
+        const prepared = prepareOpeningSequenceEntries($('openingSequenceInput').value, countsAsTurns, rules);
+        if (!prepared.valid) {
+          feedback(prepared.message);
+          $('openingSequenceInput').focus();
+          return;
+        }
+        startGameNow({ entries: prepared.entries, countsAsTurns });
+        feedback(`序盤の${prepared.entries.length}件を反映してゲームを開始しました。実際の対戦はプレイヤー1から始まります。`, 'success');
       }
 
       function feedback(message, type = '') {
@@ -4957,7 +5754,7 @@
         if (state.finished || !state.activePlayers[state.turn]) return;
         const rules = currentRules();
         const player = state.turn;
-        const turnIndex = state.words.length + 1; // 反則手は数えない。
+        const turnIndex = getNextGameTurnIndex(); // 反則手とターン数に含めない序盤指定は数えない。
         const raw = $('wordInput').value;
         if (!raw.trim()) return feedback('文字列を入力してください。');
         let display = raw;
@@ -4984,7 +5781,7 @@
           if (state.endReason === 'demo-foul') {
             feedback(`お手本は${state.words.length}ターンの悪列を生成して終了しました。`, 'success');
           } else if (state.endReason === 'solo-foul') {
-            feedback(`${nameOf(player)}がルール違反をしました。${state.words.length}ターン目まで続きました。`, 'success');
+            feedback(`${nameOf(player)}がルール違反をしました。${getCountedValidTurnCount()}ターン目まで続きました。`, 'success');
           } else if (state.finished) {
             feedback(`${nameOf(player)}は反則で脱落しました。${state.winner === null ? 'ゲームが終了しました。' : `${nameOf(state.winner)}が最後まで残りました。`}`, 'success');
           } else {
@@ -5049,7 +5846,7 @@
         try {
           bounds = readLengthBounds(rules, turnIndex);
           if (bounds.impossible) return feedback(`第${turnIndex}ターン目の文字数条件を満たせません：${bounds.impossible}`);
-          overlapNow = turnIndex > 1
+          overlapNow = previousEntry
             ? evaluateRuleFunction(rules.joinLengthFunction, turnIndex, '接続文字数', 0n)
             : 0n;
           // お手本アルゴリズムの初期ランプでは、直前の語がc文字未満なら
@@ -5156,6 +5953,7 @@
       }
 
       $('downloadGameSaveButton').addEventListener('click', downloadGameSave);
+      $('downloadMarkdownHistoryButton').addEventListener('click', downloadMarkdownGameHistory);
       $('loadGameSaveButton').addEventListener('click', () => $('loadGameSaveInput').click());
       $('loadGameSaveInput').addEventListener('change', event => {
         const file = event.target.files && event.target.files[0];
@@ -5165,7 +5963,33 @@
       // ボタンのクリックとEnterキーの両方から同じ処理を呼び出す。
       $('startGameButton').addEventListener('click', requestStartGame);
       $('cancelWarningButton').addEventListener('click', () => { $('nonWqoWarning').hidden = true; $('startGameButton').focus(); });
-      $('confirmWarningButton').addEventListener('click', startGameNow);
+      $('confirmWarningButton').addEventListener('click', continueStartFlow);
+      $('openingSequenceYesButton').addEventListener('click', () => {
+        $('openingSequenceChoice').hidden = true;
+        $('openingSequenceEditor').hidden = false;
+        $('openingSequenceInput').focus();
+      });
+      $('openingSequenceNoButton').addEventListener('click', () => {
+        $('openingSequenceChoice').hidden = true;
+        $('startGameButton').hidden = false;
+        startGameNow();
+      });
+      $('openingSequenceBackButton').addEventListener('click', () => {
+        $('openingSequenceEditor').hidden = true;
+        $('openingSequenceChoice').hidden = false;
+        $('openingSequenceYesButton').focus();
+      });
+      $('openingSequenceStartButton').addEventListener('click', submitOpeningSequence);
+      $('rulePresetName').addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); createRulePreset(); } });
+      $('saveRulePresetButton').addEventListener('click', createRulePreset);
+      $('loadRulePresetButton').addEventListener('click', loadSelectedRulePreset);
+      $('deleteRulePresetButton').addEventListener('click', deleteSelectedRulePreset);
+      $('rulePresetSelect').addEventListener('change', () => {
+        $('loadRulePresetButton').disabled = state.started || !$('rulePresetSelect').value;
+        $('deleteRulePresetButton').disabled = !$('rulePresetSelect').value;
+      });
+      $('copyAllWordsButton').addEventListener('click', copyAllWordHistory);
+      $('copyValidWordsButton').addEventListener('click', copyValidWordsOnly);
       $('nonWqoWarning').addEventListener('click', (event) => { if (event.target === $('nonWqoWarning')) $('cancelWarningButton').click(); });
 
       $('demoToSoloButton').addEventListener('click', transitionDemoToSolo);
@@ -5227,7 +6051,7 @@
       });
 
       $('undoButton').addEventListener('click', () => {
-        if (!state.history.length || state.demoBatchRunning) return;
+        if (!state.history.some(entry => !entry.isOpeningSequence) || state.demoBatchRunning) return;
         closeRewindPanel();
         const removed = undoLastHistoryEvent();
         if (!removed) return;
@@ -5287,6 +6111,14 @@
         state.winner = null;
         state.endReason = null;
         state.noMoveDetail = null;
+        state.openingSequenceUsed = false;
+        state.openingSequenceCountsAsTurns = false;
+        state.openingSequenceLength = 0;
+        $('startGameButton').hidden = false;
+        $('openingSequenceChoice').hidden = true;
+        $('openingSequenceEditor').hidden = true;
+        $('openingSequenceInput').value = '';
+        $('openingSequenceCountTurns').checked = false;
         showEmptyHistory();
         feedback('新しいゲームを始めましょう。');
         render();
@@ -5295,22 +6127,25 @@
 
       $('playerCountSetting').addEventListener('change', () => {
         if (state.history.length) return;
+        closeOpeningSequenceSetupForSettingChange();
         configurePlayerCount($('playerCountSetting').value);
         feedback(isDemoMode() ? 'お手本モードを選択しました。' : `${state.playerNames.length}人で対局します。`);
       });
       $('demoRuleValidation').addEventListener('change', () => {
+        closeOpeningSequenceSetupForSettingChange();
         render();
         feedback($('demoRuleValidation').checked
           ? 'お手本モードでルール違反の確認を行います。'
           : 'お手本モードで禁止条件の判定を省略します。');
       });
-      $('customAlphabet').addEventListener('input', () => describeRules());
-      $('subsequenceShorteningThreshold').addEventListener('input', updateSubsequenceShorteningPreview);
+      $('customAlphabet').addEventListener('input', () => { closeOpeningSequenceSetupForSettingChange(); describeRules(); });
+      $('subsequenceShorteningThreshold').addEventListener('input', () => { closeOpeningSequenceSetupForSettingChange(); updateSubsequenceShorteningPreview(); });
       ['minLengthFunction', 'maxLengthFunction', 'joinLengthFunction'].forEach(id => {
-        $(id).addEventListener('input', () => describeConstraintFunctions());
+        $(id).addEventListener('input', () => { closeOpeningSequenceSetupForSettingChange(); describeConstraintFunctions(); });
       });
       settingIds.forEach(id => {
         $(id).addEventListener('change', () => {
+          closeOpeningSequenceSetupForSettingChange();
           render();
           feedback('判定設定を変更しました。');
         });
@@ -5318,6 +6153,7 @@
 
       renderPlayerCards();
       showEmptyHistory();
+      refreshRulePresetSelect();
       render();
     })();
   </script>
