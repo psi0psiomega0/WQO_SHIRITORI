@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f2eee5">
+  <title>サイトマップ | 悪いしりとり</title>
+  <link rel="stylesheet" href="common-menu.css">
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+      color: #28332e;
+      background: #f2eee5;
+    }
+    * { box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      margin: 0;
+      background:
+        radial-gradient(ellipse at 12% 8%, rgba(199, 123, 78, .09), transparent 30rem),
+        radial-gradient(ellipse at 92% 85%, rgba(82, 119, 100, .09), transparent 34rem),
+        #f2eee5;
+    }
+    .sitemap-page {
+      width: min(960px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 34px 0 54px;
+    }
+    .sitemap-header {
+      margin: 0 0 24px;
+      text-align: center;
+    }
+    .sitemap-eyebrow {
+      color: #527764;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .16em;
+    }
+    h1 {
+      margin: 9px 0 6px;
+      font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
+      font-size: clamp(28px, 5vw, 38px);
+      font-weight: 600;
+      letter-spacing: .08em;
+    }
+    .sitemap-intro {
+      margin: 0;
+      color: #778078;
+      font-size: 13px;
+      line-height: 1.8;
+    }
+    .sitemap-note {
+      margin: 18px 0 0;
+      color: #858c83;
+      font-size: 11px;
+      line-height: 1.7;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div id="site-menu"></div>
+
+  <main class="sitemap-page">
+    <header class="sitemap-header">
+      <div class="sitemap-eyebrow">WQO SHIRITORI</div>
+      <h1>サイトマップ</h1>
+      <p class="sitemap-intro">このサイトのページ一覧です。</p>
+    </header>
+
+    <div id="sitemap-list" aria-live="polite"></div>
+    <p class="sitemap-note">ページの公開状況とリンク先は、共通メニューの設定に基づいて表示しています。</p>
+  </main>
+
+  <script src="common-menu.js" defer></script>
+</body>
+</html>
