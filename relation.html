@@ -461,6 +461,32 @@
     .sequence-line-numbers span {
       display: block;
       height: 28px;
+      border-radius: 4px;
+    }
+    .sequence-line-numbers span.is-highlighted {
+      background: #e8f0e9;
+      color: var(--green-dark);
+    }
+
+    .sequence-text-area-wrap {
+      position: relative;
+      min-width: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #fff;
+    }
+    .sequence-highlight-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      overflow: hidden;
+      pointer-events: none;
+    }
+    .sequence-highlight-row {
+      position: absolute;
+      height: 28px;
+      border-radius: 3px;
+      background: #e8f0e9;
     }
 
     #bad-sequence-input {
@@ -474,7 +500,9 @@
       border: 0;
       border-radius: 0;
       outline: 0;
-      background: #fff;
+      position: relative;
+      z-index: 1;
+      background: transparent;
       color: var(--ink);
       font: 15px/28px ui-monospace, SFMono-Regular, Consolas, monospace;
       white-space: pre;
@@ -514,20 +542,23 @@
 
     .bad-sequence-result.yes { color: var(--good); }
     .bad-sequence-result.no { color: var(--bad); }
+    .bad-sequence-result[hidden],
+    .bad-sequence-other-relations[hidden] { display: none; }
+    .bad-sequence-other-relations { margin-top: 9px; }
+    .relation-other-check { margin-top: 8px; }
 
     .implication-card { border-color: rgba(82,119,100,.25); }
     .implication-diagram-scroll {
-      overflow-x: auto;
-      padding: 12px 8px;
+      overflow: hidden;
+      padding: 6px 4px;
       border: 1px solid var(--line);
       border-radius: 12px;
       background: #fffefa;
-      scrollbar-color: #c6cec4 transparent;
     }
     svg.implication-diagram {
       display: block;
-      width: 1180px;
-      max-width: none;
+      width: 100%;
+      max-width: 980px;
       height: auto;
       margin: 0 auto;
     }
@@ -548,9 +579,10 @@
       stroke-width: 2;
       transition: fill .15s ease, stroke .15s ease, filter .15s ease;
     }
-    .implication-node text {
+    .implication-node text,
+    .implication-label {
       fill: var(--ink);
-      font-size: 17px;
+      font-size: 15px;
       font-weight: 750;
       text-anchor: middle;
       dominant-baseline: middle;
@@ -562,13 +594,53 @@
       stroke: var(--green-dark);
       filter: drop-shadow(0 2px 3px rgba(62,96,79,.12));
     }
-    .implication-node.is-on text { fill: var(--green-dark); }
+    .implication-node.is-on text,
+    .implication-label.is-on { fill: var(--green-dark); }
     .implication-node.is-on .implication-state-dot { fill: var(--green-dark); }
     .implication-node:focus-visible rect,
     .implication-node:focus rect {
       stroke: #c77b4e;
       stroke-width: 3.5;
     }
+    .implication-pattern-controls {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      margin: -7px 0 12px;
+    }
+    .implication-pattern-controls button {
+      min-width: 46px;
+      padding: 5px 9px;
+    }
+    .implication-pattern-controls button:disabled {
+      opacity: .4;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .implication-pattern-number {
+      width: 64px;
+      padding: 5px 6px;
+      border: 1px solid #dcded5;
+      border-radius: 8px;
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+    .implication-pattern-total {
+      color: var(--muted);
+      font-size: .88rem;
+      font-variant-numeric: tabular-nums;
+    }
+    .implication-pattern-indicator {
+      fill: var(--muted);
+      font-size: 12px;
+      text-anchor: end;
+      pointer-events: none;
+    }
+
     .implication-state-legend {
       display: flex;
       flex-wrap: wrap;
@@ -684,8 +756,10 @@
       <div class="batch-actions">
         <button type="button" class="swap-button" id="batch-swap">AとBを入れ替える</button>
         <button type="button" class="batch-run" id="batch-run">13種類をまとめて判定</button>
+        <button type="button" class="swap-button" id="batch-hasse-view">ハッセ図で見る</button>
       </div>
       <p class="batch-gap-warning" id="batch-gap-warning" hidden>gap部分列はひらがなのみ、カタカナのみ、アルファベットのみ、0～9の数字のみのいずれかとしてください</p>
+      <p class="batch-gap-warning" id="batch-hasse-warning" hidden></p>
       <p class="batch-gap-caption" id="batch-gap-caption" hidden></p>
       <div class="batch-results" id="batch-results" aria-live="polite" hidden></div>
     </section>
@@ -714,7 +788,10 @@
         <label for="bad-sequence-input">文字列（1行に1つ）</label>
         <div class="sequence-input-wrap">
           <div class="sequence-line-numbers" id="bad-sequence-line-numbers" aria-hidden="true"><span>1</span></div>
-          <textarea id="bad-sequence-input" rows="8" wrap="off" spellcheck="false" autocomplete="off" aria-describedby="bad-sequence-note"></textarea>
+          <div class="sequence-text-area-wrap">
+            <div class="sequence-highlight-layer" id="bad-sequence-highlights" aria-hidden="true"></div>
+            <textarea id="bad-sequence-input" rows="8" wrap="off" spellcheck="false" autocomplete="off" aria-describedby="bad-sequence-note"></textarea>
+          </div>
         </div>
       </div>
       <p class="bad-sequence-note" id="bad-sequence-note">空行は空文字列として扱います。gap系の関係を選んだ場合は、選択した文字集合の文字だけを入力してください。アルファベットは大文字・小文字を区別しません。</p>
@@ -723,8 +800,9 @@
         <button type="button" class="batch-run" id="bad-sequence-run">悪列か判定する</button>
         <button type="button" class="swap-button" id="antichain-run">反鎖か判定する</button>
       </div>
-      <p class="bad-sequence-result" id="bad-sequence-result" aria-live="polite"></p>
-      <p class="bad-sequence-result" id="antichain-result" aria-live="polite"></p>
+      <p class="bad-sequence-result" id="bad-sequence-result" aria-live="polite" hidden></p>
+      <p class="bad-sequence-result" id="antichain-result" aria-live="polite" hidden></p>
+      <button type="button" class="swap-button bad-sequence-other-relations" id="bad-sequence-other-relations" hidden>他の関係も確認する</button>
 
       <div class="bad-sequence-theory">
         <p>何らかの数学的対象(本サイトでは文字列)の列に対して、その列に対象AとBが、AよりもBが後に来るように現れて、更に前順序関係A≼Bが成り立つとき、その列は≼について<strong>良列</strong>であるといいます。逆に、AよりもBが後に現れるどんなペアについてもA≼Bが成り立たないとき、その列は≼について<strong>悪列</strong>であるといいます。</p>
@@ -735,9 +813,15 @@
 
     <section class="relation-card implication-card" aria-labelledby="implication-title">
       <h2 id="implication-title">文字列関係の含意</h2>
-      <p class="explanation">AとBの間にある文字列関係が成り立てば、他にどんな文字列関係が成り立つかを図で表しています。図中の文字列関係が成り立てば、そこから下方向へ線を辿っていける他の文字列関係も成り立ちます。<br>図の文字列関係をクリックすると点灯と消灯が切り替わり、点灯させたらそれより下も全て点灯し、消灯させたらそれより上も全て消灯します。<br>更に、点灯している関係を全て満たし、消灯している関係を全て満たさないような文字列のペアを例示します。点灯のさせ方によってはペアが存在しない場合もあるので、その場合は理由を表示します。</p>
+      <p class="explanation">AとBの間にある文字列関係が成り立てば、他にどんな文字列関係が成り立つかを図で表しています。図中の文字列関係が成り立てば、そこから下方向へ線を辿っていける他の文字列関係も成り立ちます。<br>図の文字列関係をクリックすると点灯と消灯が切り替わり、点灯させたらそれより下も全て点灯し、消灯させたらそれより上も全て消灯します。<br>更に、点灯している関係を全て満たし、消灯している関係を全て満たさないような文字列のペアを例示します。点灯のさせ方によってはペアが存在しない場合もあるので、その場合は理由を表示します。<br>ハッセ図の点灯のさせ方は47通りあります。それぞれの点灯のさせ方に適当に番号を割り振ったので、順番に見たい方は番号で入力してください。</p>
+      <div class="implication-pattern-controls" aria-label="ハッセ図の点灯パターン">
+        <button type="button" class="swap-button" id="implication-pattern-prev" aria-label="前のパターン">&lt;</button>
+        <input class="implication-pattern-number" id="implication-pattern-number" type="number" min="1" max="47" step="1" value="1" aria-label="パターン番号">
+        <span class="implication-pattern-total">/47</span>
+        <button type="button" class="swap-button" id="implication-pattern-next" aria-label="次のパターン">&gt;</button>
+      </div>
       <div class="implication-diagram-scroll">
-        <svg class="implication-diagram" id="implication-diagram" viewBox="0 0 1180 950" role="group" aria-label="文字列関係の含意を示すハッセ図。各項目をクリックすると点灯と消灯が切り替わります。"></svg>
+        <svg class="implication-diagram" id="implication-diagram" viewBox="0 0 980 640" role="group" aria-label="文字列関係の含意を示すハッセ図。各項目をクリックすると点灯と消灯が切り替わります。"></svg>
       </div>
       <div class="implication-state-legend" aria-hidden="true">
         <span><i class="implication-state-swatch is-on"></i>点灯</span>
@@ -2084,10 +2168,36 @@
 
       const badSequenceInput = document.getElementById('bad-sequence-input');
       const badSequenceLineNumbers = document.getElementById('bad-sequence-line-numbers');
+      const badSequenceHighlightLayer = document.getElementById('bad-sequence-highlights');
       const badSequenceGapCharsetWrap = document.getElementById('bad-sequence-gap-charset-wrap');
       const badSequenceGapCharset = document.getElementById('bad-sequence-gap-charset');
       const badSequenceResult = document.getElementById('bad-sequence-result');
       const antichainResult = document.getElementById('antichain-result');
+      const badSequenceOtherRelationsButton = document.getElementById('bad-sequence-other-relations');
+      let lastBadSequencePair = null;
+      let highlightedBadSequenceLines = new Set();
+
+      function updateBadSequenceHighlights() {
+        badSequenceHighlightLayer.replaceChildren();
+        const contentWidth = Math.max(badSequenceInput.clientWidth, badSequenceInput.scrollWidth);
+        for (const lineIndex of highlightedBadSequenceLines) {
+          const row = document.createElement('div');
+          row.className = 'sequence-highlight-row';
+          row.style.top = `${12 + lineIndex * 28}px`;
+          row.style.left = '0px';
+          row.style.width = `${contentWidth}px`;
+          badSequenceHighlightLayer.appendChild(row);
+        }
+        badSequenceHighlightLayer.style.transform = `translate(${-badSequenceInput.scrollLeft}px, ${-badSequenceInput.scrollTop}px)`;
+        Array.from(badSequenceLineNumbers.children).forEach((line, index) => {
+          line.classList.toggle('is-highlighted', highlightedBadSequenceLines.has(index));
+        });
+      }
+
+      function setHighlightedBadSequenceLines(indices) {
+        highlightedBadSequenceLines = new Set(indices);
+        updateBadSequenceHighlights();
+      }
 
       function updateBadSequenceLineNumbers() {
         const lineCount = badSequenceInput.value.replace(/\r\n?/g, '\n').split('\n').length;
@@ -2098,13 +2208,18 @@
           badSequenceLineNumbers.appendChild(line);
         }
         badSequenceLineNumbers.scrollTop = badSequenceInput.scrollTop;
+        updateBadSequenceHighlights();
       }
 
       function clearBadSequenceResults() {
         for (const element of [badSequenceResult, antichainResult]) {
           element.textContent = '';
           element.classList.remove('yes', 'no');
+          element.hidden = true;
         }
+        badSequenceOtherRelationsButton.hidden = true;
+        lastBadSequencePair = null;
+        setHighlightedBadSequenceLines([]);
       }
 
       function updateBadSequenceRelationControls() {
@@ -2160,9 +2275,16 @@
       }
 
       function setBadSequenceResult(element, message, positive) {
+        element.hidden = false;
         element.textContent = message;
         element.classList.toggle('yes', positive);
         element.classList.toggle('no', !positive);
+      }
+
+      function showBadSequenceWitness(witness, rows) {
+        lastBadSequencePair = { a: rows[witness.from], b: rows[witness.to] };
+        setHighlightedBadSequenceLines([witness.from, witness.to]);
+        badSequenceOtherRelationsButton.hidden = false;
       }
 
       function validateBadSequenceGapRows(rows, charset) {
@@ -2174,6 +2296,7 @@
       }
 
       function runBadSequenceCheck(checkAntichain) {
+        clearBadSequenceResults();
         const rows = getBadSequenceRows();
         const kind = badSequenceRelationSelect.value;
         const isGap = GAP_KINDS.has(kind);
@@ -2206,11 +2329,12 @@
             setBadSequenceResult(
               resultElement,
               `${describeRelationWitness(violation, rows, kind)}反鎖ではない！良いね！！`,
-              false
+              true
             );
+            showBadSequenceWitness(violation, rows);
           } else {
             const name = RELATION_LIST.find(([candidate]) => candidate === kind)?.[1] || '文字列';
-            setBadSequenceResult(resultElement, `どこにも「${name}」関係がない！反鎖だ！！`, true);
+            setBadSequenceResult(resultElement, `どこにも「${name}」関係がない！反鎖だ！！`, false);
           }
         } else {
           const witness = findBadSequenceWitness(preparedRows, kind, charset);
@@ -2220,6 +2344,7 @@
               `${describeRelationWitness(witness, rows, kind)}良いね！！`,
               true
             );
+            showBadSequenceWitness(witness, rows);
           } else {
             const name = RELATION_LIST.find(([candidate]) => candidate === kind)?.[1] || '文字列';
             setBadSequenceResult(resultElement, `どこにも「${name}」関係がない！悪い！！`, false);
@@ -2233,11 +2358,20 @@
       });
       badSequenceInput.addEventListener('scroll', () => {
         badSequenceLineNumbers.scrollTop = badSequenceInput.scrollTop;
+        updateBadSequenceHighlights();
       });
       badSequenceRelationSelect.addEventListener('change', updateBadSequenceRelationControls);
       badSequenceGapCharset.addEventListener('change', clearBadSequenceResults);
       document.getElementById('bad-sequence-run').addEventListener('click', () => runBadSequenceCheck(false));
       document.getElementById('antichain-run').addEventListener('click', () => runBadSequenceCheck(true));
+      badSequenceOtherRelationsButton.addEventListener('click', () => {
+        if (!lastBadSequencePair) return;
+        document.getElementById('batch-a').value = lastBadSequencePair.a;
+        document.getElementById('batch-b').value = lastBadSequencePair.b;
+        updateBatchResults();
+        document.querySelector('.batch-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        document.getElementById('batch-a').focus({ preventScroll: true });
+      });
       updateBadSequenceLineNumbers();
       updateBadSequenceRelationControls();
 
@@ -2309,19 +2443,19 @@
 
       // 文字列関係のハッセ図。辺は上から下への含意を表し、矢印は付けない。
       const implicationNodes = [
-        { id: 'equal', label: '同一文字列', x: 495, y: 40 },
-        { id: 'prefix', label: '前置部分文字列', x: 235, y: 170 },
-        { id: 'suffix', label: '後置部分文字列', x: 755, y: 170 },
-        { id: 'lastchar', label: '末尾文字の一致', x: 985, y: 170 },
-        { id: 'substring', label: '部分文字列', x: 495, y: 310 },
-        { id: 'rightGap', label: '右gap部分列', x: 35, y: 310 },
-        { id: 'leftGap', label: '左gap部分列', x: 955, y: 310 },
-        { id: 'rightWeakGap', label: '右弱gap部分列', x: 235, y: 460 },
-        { id: 'leftWeakGap', label: '左弱gap部分列', x: 755, y: 460 },
-        { id: 'subsequence', label: '部分列', x: 495, y: 610 },
-        { id: 'idempotent', label: '冪等部分列', x: 355, y: 750 },
-        { id: 'commutative', label: '可換部分列', x: 635, y: 750 },
-        { id: 'usedchars', label: '使用文字の包含', x: 495, y: 880 }
+        { id: 'equal', label: '同一文字列', x: 410, y: 18 },
+        { id: 'prefix', label: '前置部分文字列', x: 240, y: 112 },
+        { id: 'suffix', label: '後置部分文字列', x: 580, y: 112 },
+        { id: 'lastchar', label: '末尾文字の一致', x: 810, y: 112 },
+        { id: 'substring', label: '部分文字列', x: 410, y: 206 },
+        { id: 'rightGap', label: '右gap部分列', x: 100, y: 206 },
+        { id: 'leftGap', label: '左gap部分列', x: 710, y: 206 },
+        { id: 'rightWeakGap', label: '右弱gap部分列', x: 240, y: 300 },
+        { id: 'leftWeakGap', label: '左弱gap部分列', x: 580, y: 300 },
+        { id: 'subsequence', label: '部分列', x: 410, y: 394 },
+        { id: 'idempotent', label: '冪等部分列', x: 320, y: 488 },
+        { id: 'commutative', label: '可換部分列', x: 500, y: 488 },
+        { id: 'usedchars', label: '使用文字の包含', x: 410, y: 582 }
       ];
       const implicationEdges = [
         ['equal', 'prefix'], ['equal', 'suffix'], ['equal', 'lastchar'],
@@ -2334,6 +2468,24 @@
         ['idempotent', 'usedchars'], ['commutative', 'usedchars']
       ];
       const implicationNodeById = new Map(implicationNodes.map(node => [node.id, node]));
+
+      // 含意関係と矛盾しない47通りを列挙する。番号は点灯数の少ない順、
+      // 同じ点灯数ならimplicationNodesの並びをビット列とみなした昇順で固定する。
+      const implicationNodeOrder = implicationNodes.map(node => node.id);
+      const implicationPatternStates = [];
+      const implicationStateMask = state => implicationNodeOrder.reduce(
+        (mask, id, index) => mask | (state.has(id) ? (1 << index) : 0), 0
+      );
+      for (let mask = 0; mask < (1 << implicationNodeOrder.length); mask++) {
+        const state = new Set(implicationNodeOrder.filter((id, index) => mask & (1 << index)));
+        if (implicationEdges.every(([upper, lower]) => !state.has(upper) || state.has(lower))) {
+          implicationPatternStates.push(state);
+        }
+      }
+      implicationPatternStates.sort((a, b) => a.size - b.size || implicationStateMask(a) - implicationStateMask(b));
+      if (implicationPatternStates.length !== 47) {
+        console.error(`ハッセ図の点灯状態数が47ではありません: ${implicationPatternStates.length}`);
+      }
       const implicationDescendants = new Map(implicationNodes.map(node => [node.id, new Set([node.id])]));
       const implicationAncestors = new Map(implicationNodes.map(node => [node.id, new Set([node.id])]));
       for (const [upper, lower] of implicationEdges) {
@@ -2371,19 +2523,21 @@
       const implicationDiagram = document.getElementById('implication-diagram');
       const implicationActive = new Set(); // 初期状態は全て消灯。
       const implicationNodeElements = new Map();
+      const implicationLabelElements = new Map();
       const implicationEdgeElements = [];
-      const implicationNodeWidth = 190;
-      const implicationNodeHeight = 48;
+      const implicationNodeWidth = 160;
+      const implicationNodeHeight = 40;
 
-      // 線を先に描画し、クリック可能なノードをその上に重ねる。
+      // 線分はノードの中心間を結ぶ。先に線を描き、その上に不透明なノード枠を重ねることで、
+      // 線が枠の内部に入り込まず、枠の外側だけに表示されるようにする。
       for (const [upper, lower] of implicationEdges) {
         const from = implicationNodeById.get(upper);
         const to = implicationNodeById.get(lower);
         const line = makeSvgElement('line', {
           x1: from.x + implicationNodeWidth / 2,
-          y1: from.y + implicationNodeHeight,
+          y1: from.y + implicationNodeHeight / 2,
           x2: to.x + implicationNodeWidth / 2,
-          y2: to.y,
+          y2: to.y + implicationNodeHeight / 2,
           class: 'implication-edge',
           'data-from': upper,
           'data-to': lower
@@ -2392,6 +2546,7 @@
         implicationEdgeElements.push({ element: line, from: upper, to: lower });
       }
 
+      // ノード枠を線より手前に描く。線は中心まで定義されているが、枠に隠れる。
       for (const node of implicationNodes) {
         const group = makeSvgElement('g', {
           class: 'implication-node',
@@ -2409,20 +2564,113 @@
           cx: implicationNodeWidth - 14, cy: implicationNodeHeight / 2, r: 4.5,
           class: 'implication-state-dot'
         }));
-        group.appendChild(makeSvgElement('text', {
-          x: implicationNodeWidth / 2 - 4, y: implicationNodeHeight / 2
-        }, node.label));
         implicationDiagram.appendChild(group);
         implicationNodeElements.set(node.id, group);
       }
 
+      // ラベルは最後に描き、文字が線で読みにくくならないようにする。
+      for (const node of implicationNodes) {
+        const label = makeSvgElement('text', {
+          x: node.x + implicationNodeWidth / 2,
+          y: node.y + implicationNodeHeight / 2,
+          class: 'implication-label'
+        }, node.label);
+        implicationDiagram.appendChild(label);
+        implicationLabelElements.set(node.id, label);
+      }
+
+      const implicationPatternIndicator = makeSvgElement('text', {
+        x: 970, y: 635, class: 'implication-pattern-indicator'
+      }, '1/47');
+      implicationDiagram.appendChild(implicationPatternIndicator);
+      const implicationPatternNumberInput = document.getElementById('implication-pattern-number');
+      const implicationPatternPrev = document.getElementById('implication-pattern-prev');
+      const implicationPatternNext = document.getElementById('implication-pattern-next');
+
       const implicationPairExample = document.getElementById('implication-pair-example');
       const implicationUnresolved = document.getElementById('implication-unresolved');
+      const implicationExampleA = document.getElementById('implication-example-a');
+      const implicationExampleB = document.getElementById('implication-example-b');
+      const implicationUnresolvedText = document.querySelector('.implication-unresolved-text');
+
+      // 実現できない点灯状態に対応する理由。各状態はハッセ図の含意閉包から作る。
+      const implicationReasonEntries = [
+        { kinds: ['suffix'], text: '後置部分文字列であり末尾文字が一致しない場合、空文字列と非空文字列のペアでなければならないが、このペアは前置部分文字列関係も満たしてしまう。' },
+        { kinds: ['suffix', 'rightGap'], text: '後置部分文字列であり末尾文字が一致しない場合、空文字列と非空文字列のペアでなければならないが、このペアは前置部分文字列関係も満たしてしまう。' }
+      ].map(reason => {
+        const state = new Set();
+        for (const kind of reason.kinds) {
+          for (const implied of implicationDescendants.get(kind)) state.add(implied);
+        }
+        return { ...reason, state };
+      });
+
+      // 登録済みの例。各ペアが実際に満たす13種類の関係を既存の判定関数で計算し、
+      // ハッセ図の点灯状態と完全一致する場合にだけ、その1組を表示する。
+      // No.10は「11」「1012101」、No.11は「かくへん」「とうかくへんかん」を登録。
+      const implicationExamplePairs = [
+        // 末尾文字の一致が消灯している状態の例。
+        { a: '', b: 'LONGFINITESEQUENCES' },
+        { a: 'あき', b: 'あきたこまち' },
+        { a: 'あきた', b: 'あきたこまち' },
+        { a: 'いか', b: 'めいかひめ' },
+        { a: 'けいせん', b: 'しけいせんこく' },
+        { a: 'ほくい', b: 'とうほくいたこ' },
+        { a: 'リスト', b: 'アリストテレス' },
+        { a: 'うかい', b: 'かのうせかいいみろん' },
+        { a: 'かしか', b: 'かつしかほくさい' },
+        { a: 'ナコ', b: 'ミナセコウ' },
+        { a: 'side', b: 'quasiorder' },
+        { a: 'つつ', b: 'きつねつき' },
+        { a: 'eta', b: 'phasetransition' },
+        { a: 'gain', b: 'graphminor' },
+        { a: 'おね', b: 'いりおもてやまねこ' },
+        { a: 'まつり', b: 'まつかりすく' },
+        { a: 'りりせ', b: 'いたれりつくせり' },
+        { a: 'well', b: 'wealth' },
+        { a: 'おしみなく', b: 'くみなおし' },
+        { a: 'googol', b: 'log' },
+        { a: 'くうれつ', b: '' },
+        { a: 'あいうえお', b: 'あいうえお' },
+        { a: 'WOW', b: 'WOWOW' },
+        { a: 'しり', b: 'しりとり' },
+        { a: 'しけん', b: 'しけんかん' },
+        { a: 'かん', b: 'かかんかん' },
+        { a: 'たい', b: 'かかんたい' },
+        { a: 'いたい', b: 'せいたいけい' },
+        { a: 'かいらん', b: 'すかいらんたん' },
+        { a: 'さいあん', b: 'こくさいあんけん' },
+        { a: 'ひまり', b: 'ひまわり' },
+        { a: '011', b: '1012101' },
+        { a: '11', b: '1012101' },
+        { a: 'かくへん', b: 'とうかくへんかん' },
+        { a: 'めいこ', b: 'めんたいこ' },
+        { a: 'rain', b: 'iteration' },
+        { a: 'lose', b: 'closure' },
+        { a: 'いたん', b: 'あいえるたん' },
+        { a: 'きりん', b: 'きりたん' },
+        { a: 'tree', b: 'restore' },
+        { a: 'ささら', b: 'さくら' },
+        { a: 'かいと', b: 'めいかみこと' },
+        { a: 'たんたんめん', b: 'しこくめたん' },
+        { a: 'つのせことね', b: 'ことのはあかね' },
+        { a: '132', b: '0123202' }
+      ].map(pair => {
+        const charset = detectGapCharset(pair.a, pair.b);
+        const state = new Set();
+        for (const [kind] of RELATION_LIST) {
+          if (evaluateRelation(kind, pair.a, pair.b, charset) === true) state.add(kind);
+        }
+        return { ...pair, state };
+      });
+
+      let currentImplicationExample = null;
       function renderImplicationState() {
         for (const node of implicationNodes) {
           const element = implicationNodeElements.get(node.id);
           const isOn = implicationActive.has(node.id);
           element.classList.toggle('is-on', isOn);
+          implicationLabelElements.get(node.id).classList.toggle('is-on', isOn);
           element.setAttribute('aria-pressed', String(isOn));
           element.setAttribute('aria-label', `${node.label}：${isOn ? '点灯中' : '消灯中'}。クリックで切り替え`);
         }
@@ -2430,10 +2678,40 @@
           edge.element.classList.toggle('is-on', implicationActive.has(edge.from) && implicationActive.has(edge.to));
         }
 
-        // 現段階では同一文字列が点灯する場合のみ、全13関係を満たす仮の例を表示する。
-        const hasKnownPair = implicationActive.has('equal');
+        const patternIndex = implicationPatternStates.findIndex(state =>
+          state.size === implicationActive.size && [...state].every(kind => implicationActive.has(kind))
+        );
+        if (patternIndex >= 0) {
+          const number = patternIndex + 1;
+          implicationPatternNumberInput.value = String(number);
+          implicationPatternIndicator.textContent = `${number}/47`;
+          implicationPatternPrev.disabled = false;
+          implicationPatternNext.disabled = false;
+        } else {
+          implicationPatternNumberInput.value = '';
+          implicationPatternIndicator.textContent = '–/47';
+          implicationPatternPrev.disabled = true;
+          implicationPatternNext.disabled = true;
+        }
+
+        currentImplicationExample = implicationExamplePairs.find(example =>
+          example.state.size === implicationActive.size &&
+          [...example.state].every(kind => implicationActive.has(kind))
+        ) || null;
+
+        const hasKnownPair = currentImplicationExample !== null;
         implicationPairExample.hidden = !hasKnownPair;
         implicationUnresolved.hidden = hasKnownPair;
+        if (hasKnownPair) {
+          implicationExampleA.textContent = currentImplicationExample.a;
+          implicationExampleB.textContent = currentImplicationExample.b;
+        } else {
+          const matchingReason = implicationReasonEntries.find(reason =>
+            reason.state.size === implicationActive.size &&
+            [...reason.state].every(kind => implicationActive.has(kind))
+          );
+          implicationUnresolvedText.textContent = matchingReason ? matchingReason.text : '未解決';
+        }
       }
 
       function toggleImplicationNode(kind) {
@@ -2448,6 +2726,41 @@
         renderImplicationState();
       }
 
+      function showImplicationPattern(index) {
+        if (!Number.isInteger(index) || index < 0 || index >= implicationPatternStates.length) return;
+        implicationActive.clear();
+        for (const kind of implicationPatternStates[index]) implicationActive.add(kind);
+        renderImplicationState();
+      }
+      implicationPatternPrev.addEventListener('click', () => {
+        const current = Number(implicationPatternNumberInput.value);
+        if (!Number.isInteger(current) || current < 1 || current > implicationPatternStates.length) return;
+        const previous = current === 1 ? implicationPatternStates.length : current - 1;
+        showImplicationPattern(previous - 1);
+      });
+      implicationPatternNext.addEventListener('click', () => {
+        const current = Number(implicationPatternNumberInput.value);
+        if (!Number.isInteger(current) || current < 1 || current > implicationPatternStates.length) return;
+        const next = current === implicationPatternStates.length ? 1 : current + 1;
+        showImplicationPattern(next - 1);
+      });
+      function commitImplicationPatternInput() {
+        const number = Number(implicationPatternNumberInput.value);
+        if (!Number.isInteger(number) || number < 1 || number > implicationPatternStates.length) {
+          renderImplicationState();
+          return;
+        }
+        showImplicationPattern(number - 1);
+      }
+      implicationPatternNumberInput.addEventListener('change', commitImplicationPatternInput);
+      implicationPatternNumberInput.addEventListener('keydown', event => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          commitImplicationPatternInput();
+          implicationPatternNumberInput.blur();
+        }
+      });
+
       implicationDiagram.addEventListener('click', event => {
         const node = event.target.closest('.implication-node[data-kind]');
         if (node) toggleImplicationNode(node.dataset.kind);
@@ -2460,17 +2773,73 @@
       });
 
       document.getElementById('implication-confirm').addEventListener('click', () => {
-        const valueA = 'あいうえお';
-        const valueB = 'あいうえお';
-        document.getElementById('batch-a').value = valueA;
-        document.getElementById('batch-b').value = valueB;
+        if (!currentImplicationExample) return;
+        document.getElementById('batch-a').value = currentImplicationExample.a;
+        document.getElementById('batch-b').value = currentImplicationExample.b;
         updateBatchResults();
         document.querySelector('.batch-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
         document.getElementById('batch-a').focus({ preventScroll: true });
       });
+
+      // 一括判定で得られる13種類の真偽を、そのままハッセ図の点灯状態に反映する。
+      document.getElementById('batch-hasse-view').addEventListener('click', () => {
+        const valueA = document.getElementById('batch-a').value;
+        const valueB = document.getElementById('batch-b').value;
+        const charset = detectGapCharset(valueA, valueB);
+        const warning = document.getElementById('batch-hasse-warning');
+        warning.hidden = true;
+        warning.textContent = '';
+
+        // gap系は同一の文字集合でのみ判定できるため、判定不能な入力では図を変更しない。
+        if (!charset) {
+          warning.textContent = 'gap部分列の文字集合を判定できないため、ハッセ図を更新できません。AとBを同じ文字集合（ひらがな・カタカナ・アルファベット・数字のいずれか）にしてください。';
+          warning.hidden = false;
+          updateBatchResults();
+          return;
+        }
+
+        updateBatchResults();
+        const actualState = new Set();
+        for (const [kind] of RELATION_LIST) {
+          if (evaluateRelation(kind, valueA, valueB, charset) === true) actualState.add(kind);
+        }
+
+        // 実際の関係判定が含意図の辺と矛盾する場合は、誤った点灯を行わず理由を知らせる。
+        const brokenImplication = implicationEdges.find(([upper, lower]) =>
+          actualState.has(upper) && !actualState.has(lower)
+        );
+        if (brokenImplication) {
+          const upperName = RELATION_LIST.find(([kind]) => kind === brokenImplication[0])?.[1] || brokenImplication[0];
+          const lowerName = RELATION_LIST.find(([kind]) => kind === brokenImplication[1])?.[1] || brokenImplication[1];
+          warning.textContent = `判定結果が含意図と整合しません（${upperName}なら${lowerName}も成立するはずです）。ハッセ図は変更していません。`;
+          warning.hidden = false;
+          return;
+        }
+
+        implicationActive.clear();
+        for (const kind of actualState) implicationActive.add(kind);
+        renderImplicationState();
+        document.querySelector('.implication-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+
       renderImplicationState();
 
       document.querySelectorAll('.relation-card[data-kind]').forEach(card => {
+        const relationOtherButton = document.createElement('button');
+        relationOtherButton.type = 'button';
+        relationOtherButton.className = 'swap-button relation-other-check';
+        relationOtherButton.textContent = '他の関係も確認する';
+        relationOtherButton.addEventListener('click', () => {
+          const valueA = card.querySelector('[data-input="top"]').value;
+          const valueB = card.querySelector('[data-input="bottom"]').value;
+          document.getElementById('batch-a').value = valueA;
+          document.getElementById('batch-b').value = valueB;
+          updateBatchResults();
+          document.querySelector('.batch-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+          document.getElementById('batch-a').focus({ preventScroll: true });
+        });
+        card.querySelector('.result').insertAdjacentElement('afterend', relationOtherButton);
+
         const swap = card.querySelector('[data-swap-card]');
         if (swap) {
           swap.addEventListener('click', () => {
