@@ -914,12 +914,12 @@
       <p class="result" aria-live="polite"></p>
     </section>
 
-    <section class="relation-card" id="relation-idempotent" data-kind="idempotent" data-top="きつつき" data-bottom="かみきつき">
+    <section class="relation-card" id="relation-idempotent" data-kind="idempotent" data-top="かたたたき" data-bottom="かたぬき">
       <h2>冪等部分列</h2>
-      <p class="explanation">文字列Aに、左右の端や文字の間などにいくつか(0個以上)文字を付け足したり、連続した同じ文字を1文字にまとめたりして文字列Bができるとき、ここではAはBの<strong>冪等部分列</strong>であると言います。<br>例えば、「きつつき」の「つつ」を1文字にまとめて左に「かみ」を付け足すと「かみきつき」という文字列が作れるので、「きつつき」は「かみきつき」の冪等部分列です。<br>長い文字列が短い文字列の冪等部分列となる場合もあります。例えば「かたたたき」は「かたぬき」の冪等部分列です。</p>
+      <p class="explanation">文字列Aに、左右の端や文字の間などにいくつか(0個以上)文字を付け足したり、連続した同じ文字を1文字にまとめたりして文字列Bができるとき、ここではAはBの<strong>冪等部分列</strong>であると言います。<br>例えば、「かたたたき」の連続した「た」を1つにまとめて「かたき」として、更に「ぬ」を付け加えると「かたぬき」になります。つまり、「かたたたき」は「かたぬき」の冪等部分列です。</p>
       <div class="inputs">
-        <div class="field"><label for="idempotent-top">A</label><input id="idempotent-top" type="text" data-input="top" value="きつつき" autocomplete="off"></div>
-        <div class="field"><label for="idempotent-bottom">B</label><input id="idempotent-bottom" type="text" data-input="bottom" value="かみきつき" autocomplete="off"></div>
+        <div class="field"><label for="idempotent-top">A</label><input id="idempotent-top" type="text" data-input="top" value="かたたたき" autocomplete="off"></div>
+        <div class="field"><label for="idempotent-bottom">B</label><input id="idempotent-bottom" type="text" data-input="bottom" value="かたぬき" autocomplete="off"></div>
       </div>
       <div class="swap-row"><button type="button" class="swap-button" data-swap-card>AとBを入れ替える</button></div>
       
