@@ -1,7 +1,6 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <link rel="stylesheet" href="common-menu.css">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f5f1e9">
@@ -286,8 +285,6 @@
   </style>
 </head>
 <body>
-  <div id="site-menu"></div>
-  <script src="common-menu.js" defer></script>
   <div class="page">
     <header>
       <div class="eyebrow">BAD SEQUENCE SHIRITORI GAME</div>
@@ -3713,62 +3710,442 @@
         return firstChar.repeat(connection) + middle.join('') + firstChar.repeat(connection);
       }
 
+      // 冪等部分列用の二つの再帰的展開。
+      // 文字は alphabet の順位で扱い、0 と 1 はその最小・次点の文字を表す。
+      function createIdempotentExpanders(alphabet) {
+        if (alphabet.length < 3) {
+          throw new Error('expand／expand\'には、0・1・2に対応する3種類以上の文字が必要です。');
+        }
+        const rankMap = new Map(alphabet.map((ch, index) => [ch, index]));
+        if (rankMap.size !== alphabet.length) {
+          throw new Error('冪等部分列のお手本で使う文字集合に重複があります。');
+        }
+        const zero = alphabet[0];
+        const one = alphabet[1];
+        const maximumDepth = Math.max(128, alphabet.length * 8 + 32);
+
+        function validateInput(source, label, requireNonzeroEnd = false) {
+          if (!Array.isArray(source)) throw new Error(`${label}の入力が配列ではありません。`);
+          for (let i = 0; i < source.length; i++) {
+            if (!rankMap.has(source[i])) throw new Error(`${label}の入力に文字集合外の文字があります。`);
+            if (i > 0 && source[i] === source[i - 1]) {
+              throw new Error(`${label}の入力に隣接する同一文字があります。`);
+            }
+          }
+          if (requireNonzeroEnd && source.length && source[source.length - 1] === zero) {
+            throw new Error(`${label}は0以外の文字で終わる必要があります。`);
+          }
+        }
+
+        function validateResult(result, label) {
+          for (let i = 0; i < result.length; i++) {
+            if (!rankMap.has(result[i])) throw new Error(`${label}が文字集合外の文字を生成しました。`);
+            if (i > 0 && result[i] === result[i - 1]) {
+              throw new Error(`${label}が隣接する同一文字を生成しました（位置 ${i}）。`);
+            }
+          }
+          if (result.length > MAX_DEMO_WORD_UNITS) {
+            throw new Error(`${label}の結果が安全上限の${MAX_DEMO_WORD_UNITS.toLocaleString()}文字を超えます。`);
+          }
+          return result;
+        }
+
+        function assertParameters(x, y, label) {
+          if (!Number.isSafeInteger(x) || !Number.isSafeInteger(y) || x > y) {
+            throw new Error(`${label}の x,y は x≤y を満たす安全な整数で指定してください。`);
+          }
+          if (y < -1) throw new Error(`${label}では y=${y} は扱えません（再帰呼び出しで許される負値は -1 までです）。`);
+          if (y > MAX_DEMO_WORD_UNITS) {
+            throw new Error(`${label}の y が安全上限の${MAX_DEMO_WORD_UNITS.toLocaleString()}を超えています。`);
+          }
+        }
+
+        function makeAlternating01EndingIn1(length) {
+          const result = [];
+          for (let i = 0; i < length; i++) {
+            result.push(((length - 1 - i) % 2) === 0 ? one : zero);
+          }
+          return result;
+        }
+
+        function makeAlternatingEndingInRank(length, highRank) {
+          const result = [];
+          for (let i = 0; i < length; i++) {
+            result.push(alphabet[highRank - (((length - 1 - i) % 2) === 0 ? 0 : 1)]);
+          }
+          return result;
+        }
+
+        function trailing01Start(source) {
+          let start = source.length;
+          while (start > 0) {
+            const rank = rankMap.get(source[start - 1]);
+            if (rank !== 0 && rank !== 1) break;
+            start--;
+          }
+          return start;
+        }
+
+        function flipTrailing01(source) {
+          const start = trailing01Start(source);
+          const result = source.slice();
+          for (let i = start; i < result.length; i++) {
+            result[i] = result[i] === zero ? one : zero;
+          }
+          return result;
+        }
+
+        function replaceZero(source, replacement) {
+          return source.map(ch => ch === zero ? replacement : ch);
+        }
+
+        function maximumRank(source) {
+          let maximum = -1;
+          for (const ch of source) maximum = Math.max(maximum, rankMap.get(ch));
+          return maximum;
+        }
+
+        function isAlternatingMaximumZero(source, maximum) {
+          if (source.length < 3 || rankMap.get(source[0]) !== maximum || rankMap.get(source[source.length - 1]) !== maximum) return false;
+          for (let i = 0; i < source.length; i++) {
+            const rank = rankMap.get(source[i]);
+            if (rank !== ((i % 2) === 0 ? maximum : 0)) return false;
+          }
+          return true;
+        }
+
+        // S= A M B M C のうち、B が0以外を含み、C が0/Mの交互列となる
+        // 最も右側の区間を探す。Bは直前のMから次のMまでなのでMを含まない。
+        function findRightmostNonzeroGap(source, maximum) {
+          for (let j = source.length - 1; j >= 0; j--) {
+            if (rankMap.get(source[j]) !== maximum) continue;
+            const suffix = source.slice(j + 1);
+            if (suffix.some(ch => {
+              const rank = rankMap.get(ch);
+              return rank !== 0 && rank !== maximum;
+            })) continue;
+            let i = j - 1;
+            while (i >= 0 && rankMap.get(source[i]) !== maximum) i--;
+            if (i < 0) continue;
+            const middle = source.slice(i + 1, j);
+            if (middle.length === 0 || middle.every(ch => ch === zero)) continue;
+            return {
+              A: source.slice(0, i),
+              B: middle,
+              C: suffix
+            };
+          }
+          return null;
+        }
+
+        function recursiveCall(fn, source, x, y, label, depth) {
+          if (depth > maximumDepth) {
+            throw new Error(`${label}の再帰回数が安全上限（${maximumDepth}）を超えました。`);
+          }
+          return fn(source, x, y, depth + 1);
+        }
+
+        function expand(source, x, y, depth = 0) {
+          assertParameters(x, y, 'expand');
+          validateInput(source, 'expand');
+          if (depth > maximumDepth) throw new Error(`expandの再帰回数が安全上限（${maximumDepth}）を超えました。`);
+
+          if (source.length === 0) {
+            return validateResult(makeAlternating01EndingIn1(Math.max(0, y)), 'expand');
+          }
+
+          const lastRank = rankMap.get(source[source.length - 1]);
+          if (lastRank === 0) {
+            if (x < 0) return validateResult(source.slice(0, -1), 'expand');
+            const suffixStart = trailing01Start(source);
+            const k = source.length - suffixStart;
+            return validateResult(
+              recursiveCall(expand, source.slice(0, suffixStart), x + k, y + k, 'expand', depth),
+              'expand'
+            );
+          }
+          if (lastRank === 1) {
+            if (x <= 0) return validateResult(flipTrailing01(source), 'expand');
+            const suffixStart = trailing01Start(source);
+            const k = source.length - suffixStart;
+            return validateResult(
+              recursiveCall(expand, source.slice(0, suffixStart), x + k, y + k, 'expand', depth),
+              'expand'
+            );
+          }
+
+          const maximum = maximumRank(source);
+          const M = alphabet[maximum];
+          if (source.length === 1 && lastRank === maximum) {
+            const length = Math.max(0, y + 1);
+            return validateResult(makeAlternatingEndingInRank(length, maximum - 1), 'expand');
+          }
+
+          if (isAlternatingMaximumZero(source, maximum)) {
+            const head = recursiveCall(expand, [M], x + 1, y + 1, 'expand', depth);
+            const tail = replaceZero(source.slice(2), alphabet[maximum - 1]);
+            return validateResult(head.concat(tail), 'expand');
+          }
+
+          if (lastRank !== maximum) {
+            let split = source.length - 1;
+            while (split >= 0 && rankMap.get(source[split]) !== maximum) split--;
+            if (split < 0) throw new Error('expandの最大文字による分割に失敗しました。');
+            const A = source.slice(0, split);
+            const B = source.slice(split + 1);
+            const replacement = recursiveCall(expand, B, x, y, 'expand', depth);
+            return validateResult(A.concat([M], replacement), 'expand');
+          }
+
+          const split = findRightmostNonzeroGap(source, maximum);
+          if (split) {
+            const { A, B, C } = split;
+            const endsInZeroOrOne = rankMap.get(B[B.length - 1]) <= 1;
+            if (endsInZeroOrOne) {
+              const BPrime = recursiveCall(expand, B, -1, 0, 'expand', depth);
+              const p = B.length - BPrime.length;
+              if (C.length === 0) {
+                const tail = recursiveCall(expand, [M], x - 1 + p, y - 1 + p, 'expand', depth);
+                return validateResult(A.concat([M], BPrime, [M], tail), 'expand');
+              }
+              const CPrime = replaceZero(C.slice(2), alphabet[maximum - 1]);
+              const middle = recursiveCall(expand, [M], x + p, y + p, 'expand', depth);
+              return validateResult(A.concat([M], BPrime, [M], middle, [M], CPrime), 'expand');
+            }
+            const CPrime = replaceZero(C, alphabet[maximum - 1]);
+            const middle = recursiveCall(expand, B, x, y, 'expand', depth);
+            return validateResult(A.concat([M], middle, [M], CPrime), 'expand');
+          }
+
+          // ここまで来た場合、Mの間は0だけであり、SはMから始まらない。
+          let firstMaximum = 0;
+          while (firstMaximum < source.length && rankMap.get(source[firstMaximum]) !== maximum) firstMaximum++;
+          if (firstMaximum === 0 || firstMaximum === source.length) {
+            throw new Error('expandの末尾Mに対する分割条件を満たしません（規則⑪）。');
+          }
+          const A = source.slice(0, firstMaximum);
+          const C = source.slice(firstMaximum + 1);
+          if (C.some(ch => {
+            const rank = rankMap.get(ch);
+            return rank !== 0 && rank !== maximum;
+          })) {
+            throw new Error('expandの規則⑪で、Cが0/Mの交互列になっていません。');
+          }
+
+          if (rankMap.get(A[A.length - 1]) <= 1) {
+            const APrime = recursiveCall(expand, A, -1, 0, 'expand', depth);
+            const p = A.length - APrime.length;
+            if (C.length === 0) {
+              const tail = recursiveCall(expand, [M], x - 1 + p, y - 1 + p, 'expand', depth);
+              return validateResult(APrime.concat([M], tail), 'expand');
+            }
+            const CPrime = replaceZero(C.slice(2), alphabet[maximum - 1]);
+            const middle = recursiveCall(expand, [M], x + p, y + p, 'expand', depth);
+            return validateResult(APrime.concat([M], middle, [M], CPrime), 'expand');
+          }
+
+          const CPrime = replaceZero(C, alphabet[maximum - 1]);
+          const AExpanded = recursiveCall(expand, A, x, y, 'expand', depth);
+          // expand の規則⑬には expand' の「先頭0を除去する」特例はない。
+          return validateResult(AExpanded.concat([M], CPrime), 'expand');
+        }
+
+        function expandPrime(source, x, y, depth = 0) {
+          assertParameters(x, y, "expand'");
+          validateInput(source, "expand'", true);
+          if (depth > maximumDepth) throw new Error(`expand'の再帰回数が安全上限（${maximumDepth}）を超えました。`);
+
+          if (source.length === 0) {
+            return validateResult(makeAlternating01EndingIn1(Math.max(0, y)), "expand'");
+          }
+
+          const lastRank = rankMap.get(source[source.length - 1]);
+          if (lastRank === 1) {
+            const suffixStart = trailing01Start(source);
+            if (x < 0) {
+              // 末尾の0/1交互部分列の先頭1文字を取り除く。
+              return validateResult(source.slice(0, suffixStart).concat(source.slice(suffixStart + 1)), "expand'");
+            }
+            const k = source.length - suffixStart;
+            return validateResult(
+              recursiveCall(expandPrime, source.slice(0, suffixStart), x + k, y + k, "expand'", depth),
+              "expand'"
+            );
+          }
+
+          const maximum = maximumRank(source);
+          const M = alphabet[maximum];
+          if (source.length === 1 && lastRank === maximum) {
+            const length = Math.max(0, y + 1);
+            return validateResult(makeAlternatingEndingInRank(length, maximum - 1), "expand'");
+          }
+
+          if (isAlternatingMaximumZero(source, maximum)) {
+            const head = recursiveCall(expandPrime, [M], x + 1, y + 1, "expand'", depth);
+            const tail = replaceZero(source.slice(2), alphabet[maximum - 1]);
+            if (head[0] === zero) {
+              const adjustedTail = tail.slice();
+              if (adjustedTail.length === 0) throw new Error("expand'の規則⑥でS'が空になりました。");
+              adjustedTail.splice(1, 0, alphabet[maximum - 2]);
+              return validateResult(head.slice(1).concat(adjustedTail), "expand'");
+            }
+            return validateResult(head.concat(tail), "expand'");
+          }
+
+          if (lastRank !== maximum) {
+            let splitIndex = source.length - 1;
+            while (splitIndex >= 0 && rankMap.get(source[splitIndex]) !== maximum) splitIndex--;
+            if (splitIndex < 0) throw new Error("expand'の最大文字による分割に失敗しました。");
+            const A = source.slice(0, splitIndex);
+            const B = source.slice(splitIndex + 1);
+            const replacement = recursiveCall(expand, B, x, y, 'expand', depth);
+            return validateResult(A.concat([M], replacement), "expand'");
+          }
+
+          const split = findRightmostNonzeroGap(source, maximum);
+          if (split) {
+            const { A, B, C } = split;
+            const endsInZeroOrOne = rankMap.get(B[B.length - 1]) <= 1;
+            if (endsInZeroOrOne) {
+              const BPrime = recursiveCall(expand, B, -1, 0, 'expand', depth);
+              const p = B.length - BPrime.length;
+              if (C.length === 0) {
+                const tail = recursiveCall(expand, [M], x - 1 + p, y - 1 + p, 'expand', depth);
+                return validateResult(A.concat([M], BPrime, [M], tail), "expand'");
+              }
+              const CPrime = replaceZero(C.slice(2), alphabet[maximum - 1]);
+              const middle = recursiveCall(expand, [M], x + p, y + p, 'expand', depth);
+              return validateResult(A.concat([M], BPrime, [M], middle, [M], CPrime), "expand'");
+            }
+            const CPrime = replaceZero(C, alphabet[maximum - 1]);
+            const middle = recursiveCall(expand, B, x, y, 'expand', depth);
+            return validateResult(A.concat([M], middle, [M], CPrime), "expand'");
+          }
+
+          // Mの間が0だけで、SがMから始まらない場合。
+          let firstMaximum = 0;
+          while (firstMaximum < source.length && rankMap.get(source[firstMaximum]) !== maximum) firstMaximum++;
+          if (firstMaximum === 0 || firstMaximum === source.length) {
+            throw new Error("expand'の規則⑪の分割条件を満たしません。");
+          }
+          const A = source.slice(0, firstMaximum);
+          const C = source.slice(firstMaximum + 1);
+          if (C.some(ch => {
+            const rank = rankMap.get(ch);
+            return rank !== 0 && rank !== maximum;
+          })) {
+            throw new Error("expand'の規則⑪で、Cが0/Mの交互列になっていません。");
+          }
+
+          if (rankMap.get(A[A.length - 1]) <= 1) {
+            let APrime = recursiveCall(expand, A, -1, 0, 'expand', depth);
+            if (APrime[0] === zero) APrime = APrime.slice(1);
+            const p = A.length - APrime.length;
+            if (C.length === 0) {
+              const tail = recursiveCall(expand, [M], x - 1 + p, y - 1 + p, 'expand', depth);
+              return validateResult(APrime.concat([M], tail), "expand'");
+            }
+            const CPrime = replaceZero(C.slice(2), alphabet[maximum - 1]);
+            const middle = recursiveCall(expand, [M], x + p, y + p, 'expand', depth);
+            return validateResult(APrime.concat([M], middle, [M], CPrime), "expand'");
+          }
+
+          const CPrime = replaceZero(C, alphabet[maximum - 1]);
+          let AExpanded = recursiveCall(expandPrime, A, x, y, "expand'", depth);
+          if (AExpanded[0] === zero) {
+            AExpanded = AExpanded.slice(1);
+            const MMinus = C.length === 0 ? alphabet[maximum - 1] : alphabet[maximum - 2];
+            return validateResult(AExpanded.concat([M, MMinus], CPrime), "expand'");
+          }
+          return validateResult(AExpanded.concat([M], CPrime), "expand'");
+        }
+
+        function checkedTopLevel(fn, source, x, y, label) {
+          const result = fn(source, x, y, 0);
+          const minimumLength = source.length + x;
+          const maximumLength = source.length + y;
+          if (result.length < minimumLength || result.length > maximumLength) {
+            throw new Error(`${label}の長さ条件に反します。入力長${source.length}、x=${x}、y=${y}に対し、出力長は${result.length}です（許容範囲 ${minimumLength}～${maximumLength}）。`);
+          }
+          return result;
+        }
+
+        return { expand, expandPrime, checkedTopLevel };
+      }
+
+      function idempotentDemoSignedNumber(value, label) {
+        const number = Number(value);
+        if (!Number.isSafeInteger(number)) throw new Error(`${label}を安全な整数として扱えません。`);
+        return number;
+      }
+
       // 冪等部分列禁止のお手本列。
-      // 中央部の文字列 S は最小文字を除いた文字集合で生成し、各文字の間に最小文字を挟む。
+      // 接続数0ではexpand、正の場合は左右の接続部を0で固定して中央部をexpand'で更新する。
       function createIdempotentDemoCandidate(rules, alphabet, connectionValue) {
-        if (alphabet.length < 2) {
-          throw new Error('冪等部分列禁止のお手本には、五十音順（または設定順）で最初の2種類以上の文字が必要です。');
+        if (alphabet.length < 3) {
+          throw new Error('新しい冪等部分列のお手本には、五十音順（または設定順）で3種類以上の文字が必要です。');
         }
         const turnIndex = state.words.length + 1;
         const connection = demoSafeNonnegativeLength(connectionValue, '接続文字数');
-        const bounds = readLengthBounds(rules, turnIndex);
+        const bounds = readSubsequenceDemoBounds(rules, turnIndex);
         if (bounds.max === null) {
           throw new Error('冪等部分列禁止のお手本モードでは、文字数上限を指定してください。');
         }
         const maximum = demoSafeIntegerLength(bounds.max, `第${turnIndex}ターン目の文字数上限`);
         const firstChar = alphabet[0];
-        const secondChar = alphabet[1];
-        const leftBoundary = Array.from({ length: connection }, (_, index) => alphabet[index % 2]).join('');
-
-        // 上限が2c以下なら、単語全体を最初の2文字の交互列にする。
-        if (BigInt(maximum) <= 2n * connectionValue) {
-          return Array.from({ length: maximum }, (_, index) => alphabet[index % 2]).join('');
-        }
-
-        const middleLength = maximum - 2 * connection;
-        const q = Math.floor((middleLength + 1) / 2);
-        const centralAlphabet = alphabet.slice(1);
-        const centralFirst = centralAlphabet[0];
-        const centralLast = centralAlphabet[centralAlphabet.length - 1];
-        const rankMap = new Map(centralAlphabet.map((ch, index) => [ch, index]));
         const previous = state.words[state.words.length - 1] || null;
-        let source;
+        const expanders = createIdempotentExpanders(alphabet);
+        const makeInitialMiddle = length => makeInitialIdempotentMiddle(alphabet, length);
 
-        // 先行ターンが2c以下で中央部を持たない場合は、ここを中央列の初期状態とする。
-        if (!previous || previous.units.length <= 2 * connection) {
-          source = Array(q).fill(centralLast);
-        } else {
-          const previousMiddle = previous.units.slice(connection, previous.units.length - connection);
-          // 中央部では最小文字が区切り・右詰めにのみ使われるため、取り除けば S を復元できる。
-          source = previousMiddle.filter(ch => ch !== firstChar);
-          if (source.some(ch => !rankMap.has(ch))) {
-            throw new Error('冪等部分列禁止のお手本の中央部に、想定外の文字が含まれています。');
-          }
-          const lower = rules.reciprocal === 'mutual' ? q : 0;
-          source = nextSubsequenceMiddle(source, lower, q, centralAlphabet, centralFirst, rankMap);
+        if (connection === 0) {
+          if (!previous) return makeInitialMiddle(maximum).join('');
+          const source = previous.units.slice();
+          const lowerBound = bounds.min === null ? 1n : (bounds.min > 1n ? bounds.min : 1n);
+          const x = idempotentDemoSignedNumber(lowerBound - BigInt(source.length), 'expandのx');
+          const y = idempotentDemoSignedNumber(bounds.max - BigInt(source.length), 'expandのy');
+          const result = expanders.checkedTopLevel(expanders.expand, source, x, y, 'expand');
+          return result.join('');
         }
 
-        // S の各文字の間に最小文字を挟み、残りは中央部の右端を最小文字で埋める。
-        const middle = [];
-        for (let index = 0; index < source.length; index++) {
-          if (index > 0) middle.push(firstChar);
-          middle.push(source[index]);
+        const twiceConnection = 2n * connectionValue;
+        // 中央部を置けない短い語は、接続部分をすべて最小文字にする。
+        // これにより、次のターンの接続（直前の末尾 c 文字）も正しく0で固定される。
+        if (bounds.max <= twiceConnection) {
+          return firstChar.repeat(maximum);
         }
-        while (middle.length < middleLength) middle.push(firstChar);
-        if (middle.length !== middleLength) {
-          throw new Error('冪等部分列禁止のお手本の中央部が、指定された文字数に一致しません。');
+
+        const middleMaximum = demoSafeNonnegativeLength(bounds.max - twiceConnection, '冪等部分列のお手本中央部上限');
+        if (!previous) {
+          const middle = makeInitialMiddle(middleMaximum);
+          return firstChar.repeat(connection) + middle.join('') + firstChar.repeat(connection);
         }
-        return leftBoundary + middle.join('') + leftBoundary;
+
+        const expectedBoundary = Math.min(connection, previous.units.length);
+        if (previous.units.slice(-expectedBoundary).some(ch => ch !== firstChar)) {
+          throw new Error('直前の文字列の末尾接続部が最小文字0で固定されていません。');
+        }
+        let source = previous.units.length > 2 * connection
+          ? previous.units.slice(connection, previous.units.length - connection)
+          : [];
+        // expand' の入力は0以外で終わる。中央部末尾の0は右側の接続0と
+        // 同じ連続部分に融合するため、次ターンの中央部からは除いて接続部として扱う。
+        if (source[source.length - 1] === firstChar) source = source.slice(0, -1);
+        const minimumFull = bounds.min === null ? 1n : (bounds.min > 1n ? bounds.min : 1n);
+        const minimumMiddleBig = minimumFull > twiceConnection ? minimumFull - twiceConnection : 0n;
+        const x = idempotentDemoSignedNumber(minimumMiddleBig - BigInt(source.length), "expand'のx");
+        const y = idempotentDemoSignedNumber(BigInt(middleMaximum) - BigInt(source.length), "expand'のy");
+        const middle = expanders.checkedTopLevel(expanders.expandPrime, source, x, y, "expand'");
+        return firstChar.repeat(connection) + middle.join('') + firstChar.repeat(connection);
+      }
+
+      function makeInitialIdempotentMiddle(alphabet, length) {
+        const maximum = alphabet.length - 1;
+        const result = [];
+        for (let i = 0; i < length; i++) {
+          const fromEnd = length - 1 - i;
+          result.push(alphabet[maximum - (fromEnd % 2)]);
+        }
+        return result;
       }
 
       // 可換部分列禁止のお手本列。配列の各成分は、文字集合の対応する文字の出現回数。
