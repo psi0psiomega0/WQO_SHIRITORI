@@ -4510,7 +4510,8 @@
 
       function transformGapDemoRanks(input, amount, alphabetSize, rules, connection) {
         const left = rules.ending === 'leftGap' || rules.ending === 'leftWeakGap';
-        const weak = rules.ending === 'rightWeakGap' || rules.ending === 'leftWeakGap' || connection > 0;
+        // 接続文字数が正の場合だけ弱版を使う。接続数0の弱gapは通常版で変換する。
+        const weak = connection > 0;
         let transformed;
         if (weak && alphabetSize > 1) {
           transformed = transformGapRankString([0].concat(input), amount, alphabetSize).slice(1);
@@ -4548,6 +4549,13 @@
 
         const innerMaximum = bounds.maximum - twiceConnection;
         if (turnIndex === 1) {
+          const weakGapWithoutConnection = connection === 0
+            && (rules.ending === 'rightWeakGap' || rules.ending === 'leftWeakGap');
+          if (weakGapWithoutConnection) {
+            const openingRanks = [0].concat(Array(Math.max(0, innerMaximum - 1)).fill(alphabet.length - 1));
+            if (rules.ending === 'leftWeakGap') openingRanks.reverse();
+            return openingRanks.map(rank => alphabet[rank]).join('');
+          }
           return first.repeat(connection)
             + alphabet[alphabet.length - 1].repeat(innerMaximum)
             + first.repeat(connection);
