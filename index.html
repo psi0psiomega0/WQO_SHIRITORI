@@ -4475,9 +4475,15 @@
           if (amount < finalBlock.length) {
             tail = [0].concat(finalBlock).slice(0, amount + 1);
           } else {
-            // m-1 で再帰するため、ここでは S_{p-1}^- に下げてから扱う。
-            const loweredTail = [0].concat(finalBlock.map(value => value - 1));
-            tail = transformGapRankString(loweredTail, amount - finalBlock.length, m - 1, orderCache);
+            // 0 S_{p-1} (0 (S_{p-1}^-[n-|S_{p-1}|]_{m-1})^+) を付ける。
+            const loweredFinal = finalBlock.map(value => value - 1);
+            const transformed = transformGapRankString(
+              loweredFinal,
+              amount - finalBlock.length,
+              m - 1,
+              orderCache
+            ).map(value => value + 1);
+            tail = [0].concat(transformed);
           }
           return beforeLast.concat([0], finalBlock, tail);
         }
